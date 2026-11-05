@@ -255,10 +255,13 @@
 
   /* ---------- Views ---------- */
   function navBar(active) {
-    return '<nav class="nav">' +
-      '<button class="slot-l ' + (active === 'today' ? 'on' : '') + '" data-act="go" data-v="today">' + icon('target') + 'Today</button>' +
+    function tab(v, ic, label) {
+      return '<button class="' + (active === v ? 'on' : '') + '" data-act="go" data-v="' + v + '"' + (active === v ? ' aria-current="page"' : '') + '>' + icon(ic) + '<span>' + label + '</span></button>';
+    }
+    return '<nav class="nav" aria-label="Main">' +
+      tab('today', 'target', 'Today') + tab('eat', 'leaf', 'Eat') +
       '<button class="fab" data-act="go" data-v="log" aria-label="Log something">' + icon('plus') + '</button>' +
-      '<button class="slot-r ' + (active === 'patterns' ? 'on' : '') + '" data-act="go" data-v="patterns">' + icon('trend') + 'Patterns</button>' +
+      tab('patterns', 'trend', 'Patterns') + tab('settings', 'sliders', 'Settings') +
       '</nav>';
   }
 
@@ -292,7 +295,7 @@
     var sweep = k < 0.5 ? (waning ? 1 : 0) : (waning ? 0 : 1);
     return outer + 'A' + rx.toFixed(2) + ' ' + r + ' 0 0 ' + sweep + ' ' + x + ' ' + top + 'Z';
   }
-  function moonRing(info, whenShort) {
+  function moonRing(info, whenShort, compact) {
     var cl = info.cl, R = 140, C = 170, mr = Math.min(13.5, 0.4 * 2 * Math.PI * R / cl), parts = '';
     for (var d = 1; d <= cl; d++) {
       var a = (d - 0.5) / cl * 2 * Math.PI - Math.PI / 2, cx = C + R * Math.cos(a), cy = C + R * Math.sin(a);
@@ -304,6 +307,9 @@
       if (d === info.day) parts += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="' + (mr + 6).toFixed(1) + '" fill="none" stroke="#2A2433" stroke-width="3"/>';
     }
     var ph = PHASES[info.phase];
+    if (compact) return '<svg class="donut" viewBox="0 0 340 340" role="img" aria-label="Cycle day ' + info.rawDay + ' of about ' + cl + ', ' + ph.label + ' phase">' + parts +
+      '<text x="170" y="150" text-anchor="middle" font-size="26" font-weight="500" fill="#2A2433">Day</text>' +
+      '<text x="170" y="214" text-anchor="middle" font-size="76" font-weight="700" fill="#2A2433">' + info.rawDay + '</text></svg>';
     return '<svg class="donut" viewBox="0 0 340 340" role="img" aria-label="Cycle day ' + info.rawDay + ' of about ' + cl + ', ' + ph.label + ' phase">' + parts +
       '<text x="170" y="138" text-anchor="middle" font-size="15" font-weight="700" letter-spacing="2" fill="' + ph.hex + '">' + ph.label.toUpperCase() + ' PHASE</text>' +
       '<text x="170" y="192" text-anchor="middle" font-size="56" font-weight="700" fill="#2A2433">Day ' + info.rawDay + '</text>' +
@@ -325,7 +331,7 @@
     return d <= od + 8 ? 'Progesterone is rising and high, which can make you warmer, sleepier and hungrier.' : 'Both main hormones are falling before your period.';
   }
   function hormoneCard(info) {
-    var cl = info.cl, od = cl - 14, W = 340, H = 150, x0 = 4, x1 = W - 4, yb = 130, yt = 14;
+    var cl = info.cl, od = cl - 14, W = 340, H = 92, x0 = 4, x1 = W - 4, yb = 76, yt = 10;
     function X(t) { return x0 + (t - 1) / (cl - 1) * (x1 - x0); }
     function Y(v) { return yb - v * (yb - yt); }
     var svg = '', i, t, pts, dpath;
@@ -339,20 +345,18 @@
     svg += '<line x1="' + mx + '" y1="' + (yt - 2) + '" x2="' + mx + '" y2="' + yb + '" stroke="#2A2433" stroke-width="2"/><circle cx="' + mx + '" cy="' + (yt - 2) + '" r="5" fill="#2A2433"/>';
     var bars = phaseLayout().map(function (p) {
       var a = X(p.from - 0.5 < 1 ? 1 : p.from - 0.5), b = X(p.to + 0.5 > cl ? cl : p.to + 0.5);
-      return '<rect x="' + (a + 1).toFixed(1) + '" y="' + (yb + 10) + '" width="' + Math.max(2, b - a - 2).toFixed(1) + '" height="8" rx="4" fill="' + PHASES[p.key].hex + '"/>';
+      return '<rect x="' + (a + 1).toFixed(1) + '" y="' + (yb + 6) + '" width="' + Math.max(2, b - a - 2).toFixed(1) + '" height="7" rx="3.5" fill="' + PHASES[p.key].hex + '"/>';
     }).join('');
     var legend = HORMONES.map(function (hm) { return '<span><i style="background:' + hm.hex + '"></i>' + hm.key + '</span>'; }).join('');
-    return '<section class="hero hormones"><h2>Your hormones</h2><div class="legend" style="justify-content:flex-start;margin:6px 0 8px">' + legend + '</div>' +
-      '<svg viewBox="0 0 ' + W + ' ' + (H + 10) + '" class="hchart" role="img" aria-label="Typical hormone levels across your cycle">' + svg + bars + '</svg>' +
-      '<p class="muted" style="text-align:left;margin-top:8px;font-size:15px">' + esc(hormoneNote(info)) + '</p>' +
-      '<p class="muted" style="text-align:left;margin-top:6px;font-size:12.5px">' + (isHormonal() ? 'A typical natural cycle, not your own levels. Hormonal birth control changes this pattern.' : 'A typical cycle, not your own measured levels.') + '</p></section>';
+    return '<section class="hero hormones compact"><h2>Your hormones</h2><div class="legend">' + legend + '</div>' +
+      '<svg viewBox="0 0 ' + W + ' ' + (H + 8) + '" class="hchart" role="img" aria-label="Typical hormone levels across your cycle">' + svg + bars + '</svg>' +
+      '<p class="hnote">' + esc(hormoneNote(info)) + '</p></section>';
   }
 
   function hasGroups(T, body) { return !!T.know && T.know.some(function (g) { return (g[0] === 'Body') === body; }); }
   function viewToday() {
     var info = cycleInfo(todayIso());
-    var h = '<div class="banner"><div><small>' + esc(longToday()) + '</small><h1>Today</h1></div>' +
-      '<button class="round-btn" data-act="go" data-v="settings" aria-label="Settings">' + icon('sliders') + '</button></div>';
+    var h = '<div class="banner"><div><small>' + esc(longToday()) + '</small><h1>Today</h1></div></div>';
     if (!info) {
       return h + '<div class="card setup"><h2>When did your last period start?</h2><p>Add the first day and I will work out where you are in your cycle. You can change it any time.</p>' +
         '<input type="date" id="firstStart" max="' + todayIso() + '" value="' + todayIso() + '">' +
@@ -366,17 +370,21 @@
     else when = 'Period likely in about ' + info.toPeriod + (info.toPeriod === 1 ? ' day' : ' days');
     var legend = phaseLayout().map(function (p) { return '<span><i style="background:' + PHASES[p.key].hex + '"></i>' + PHASES[p.key].label + '</span>'; }).join('');
     var whenShort = info.late ? 'Period may be late' : info.phase === 'period' ? 'Period day ' + info.rawDay + ' of about ' + db.settings.periodLength : 'Period in about ' + info.toPeriod + (info.toPeriod === 1 ? ' day' : ' days');
-    h += '<section class="hero">' + moonRing(info, whenShort) + '</section>';
+    h += '<section class="hero phase-hero"><div class="ring">' + moonRing(info, whenShort, true) + '</div><div class="phase-txt"><span class="plabel" style="color:' + ph.hex + '">' + ph.label + ' phase</span><span class="pwhen">' + esc(whenShort) + '</span></div></section>';
     h += hormoneCard(info);
-    if (isHormonal()) h += '<div class="card"><p><b>Hormonal method:</b> phases are only a rough guide because your hormones are steadier than a natural cycle.</p></div>';
-    h += '<section class="card"><h2>What’s likely going on</h2><p>' + esc(T.likely) + '</p>' + (hasGroups(T, true) ? '<button class="more" data-act="learn" data-k="going">See more ' + icon('chevR') + '</button>' : '') + '</section>';
-    h += '<section class="card"><h2>You may notice</h2><div class="chips">' + T.notice.map(function (n) { return '<span class="chip">' + esc(n) + '</span>'; }).join('') + '</div></section>';
-    h += '<section class="card"><h2>Worth doing these days</h2>' + T.todo.map(function (r) { return '<div class="do-row"><span class="tag ' + r[0] + '">' + r[0] + '</span><p>' + esc(T.know ? r[1].split('. ')[0].replace(/\.$/, '') + '.' : r[1]) + '</p></div>'; }).join('') + (hasGroups(T, false) ? '<button class="more" data-act="learn" data-k="do">See more ' + icon('chevR') + '</button>' : '') + '</section>';
-    h += '<section class="card" style="padding:12px 16px"><button class="big-row" style="margin:0" data-act="go" data-v="eat"><span class="icon-tile tile-green">' + icon('leaf') + '</span><span><span class="t">What to eat</span><span class="s">Seasonal food that suits your phase</span></span><span class="chev">' + icon('chevR') + '</span></button></section>';
-    h += '<p class="quiet" style="margin-top:8px">General wellbeing tips, not medical advice. If pain is severe or unusual for you, talk to a doctor.</p>';
+    if (isHormonal()) h += '<p class="quiet hbc"><b>Hormonal method:</b> phases are only a rough guide.</p>';
+    var gTap = hasGroups(T, false);
+    h += '<section class="card combo"><div class="blk likely tap" data-act="learn" data-k="going" role="button" tabindex="0"><div class="bh"><h2>What’s likely going on</h2><span class="more">Read more ' + icon('chevR') + '</span></div><p class="clamp">' + esc(T.likely) + '</p></div>' +
+      '<div class="blk doing' + (gTap ? ' tap" data-act="learn" data-k="do" role="button" tabindex="0' : '') + '"><div class="bh"><h2>Worth doing</h2>' + (gTap ? '<span class="more">Read more ' + icon('chevR') + '</span>' : '') + '</div><div class="do-list">' +
+      T.todo.map(function (r) { return '<div class="do-row"><span class="tag ' + r[0] + '">' + r[0] + '</span><p>' + esc(T.know ? r[1].split('. ')[0].replace(/\.$/, '') + '.' : r[1]) + '</p></div>'; }).join('') + '</div></div></section>';
     return h + navBar('today');
   }
 
+  function banner(small, title, backTo) {
+    return '<div class="banner' + (backTo ? ' has-back' : '') + '">' +
+      (backTo ? '<button class="round-btn back-btn" data-act="go" data-v="' + backTo + '" aria-label="Back">' + icon('back') + '</button>' : '') +
+      '<div><small>' + esc(small) + '</small><h1>' + esc(title) + '</h1></div></div>';
+  }
   function viewLog() {
     function row(i) {
       var sub = (i.pinned && i.sub) ? i.sub : lastLoggedText(i.id);
@@ -385,7 +393,7 @@
     }
     var pinned = db.issues.filter(function (i) { return i.pinned; });
     var yours = db.issues.filter(function (i) { return !i.pinned; });
-    var h = '<div class="sheet-head"><h1>What’s worth noting?</h1><button class="x" data-act="go" data-v="today" aria-label="Close">' + icon('x') + '</button></div>' +
+    var h = banner('Log', 'What’s worth noting?', 'today') +
       '<p class="sub" style="margin-top:8px">Everything here is optional. Only log what you want to remember.</p>' +
       '<div class="section-h" style="color:var(--muted);font-weight:500">Pinned</div>' + pinned.map(row).join('');
     h += '<div class="section-h" style="color:var(--muted);font-weight:500">Your issues</div>' + yours.map(row).join('');
@@ -460,8 +468,7 @@
   function viewIssue() {
     var d = ui.draft, issue = issueById(d.issueId);
     var ci = cycleInfo(todayIso());
-    var h = '<button class="back" data-act="go" data-v="log">' + icon('back') + ' Back</button>' +
-      '<h1 class="screen-title">' + esc(issue.name) + '</h1>' +
+    var h = banner('Log', issue.name, 'log') +
       '<p class="sub">' + (ci ? 'Cycle day ' + ci.rawDay + ' is added for you.' : 'Add a few details if you like.') + '</p>';
     h += insightText(issue);
 
@@ -504,7 +511,7 @@
       return '<button class="big-row" ' + (added ? 'disabled style="opacity:.55"' : 'data-act="addPreset" data-id="' + p.id + '"') + '><span class="icon-tile ' + p.tile + '">' + icon(p.icon) + '</span><span><span class="t">' + esc(p.name) + '</span><span class="s">' + esc(added ? 'Already added' : p.sub) + '</span></span>' +
         (added ? '' : '<span class="chev">' + icon('plus') + '</span>') + '</button>';
     }).join('');
-    return '<button class="back" data-act="go" data-v="log">' + icon('back') + ' Back</button><h1 class="screen-title">Add an issue</h1>' +
+    return banner('Log', 'Add an issue', 'log') +
       '<p class="sub">Pick a ready-made one, or make your own.</p>' +
       '<div class="section-h" style="color:var(--muted);font-weight:500">Ready-made</div>' + presets +
       '<div class="section-h" style="color:var(--muted);font-weight:500;margin-top:26px">Or make your own</div>' +
@@ -534,7 +541,7 @@
   ];
   function viewSettings() {
     var s = db.settings, cur = BC.filter(function (b) { return b[0] === s.birthControl; })[0] || BC[0];
-    var h = '<button class="back" data-act="go" data-v="today">' + icon('back') + ' Back</button><h1 class="screen-title">Settings</h1>' +
+    var h = banner('Your cycle and data', 'Settings') +
       '<div class="label" style="margin-top:14px">Your cycle</div><div class="stepper-card">' +
       '<div class="stepper"><span>Cycle length</span><span class="ctl"><button data-act="step" data-k="cycleLength" data-n="-1" aria-label="Shorter">−</button><span>' + s.cycleLength + ' days</span><button data-act="step" data-k="cycleLength" data-n="1" aria-label="Longer">+</button></span></div>' +
       '<div class="stepper"><span>Period length</span><span class="ctl"><button data-act="step" data-k="periodLength" data-n="-1" aria-label="Shorter">−</button><span>' + s.periodLength + ' days</span><button data-act="step" data-k="periodLength" data-n="1" aria-label="Longer">+</button></span></div></div>';
@@ -550,8 +557,7 @@
       '<button class="btn secondary" data-act="export">Download backup</button>' +
       '<button class="btn danger" data-act="wipe">Delete all my data</button>';
     h += '<div class="label">Sources</div><p class="sub">Personal perspectives, not medical advice. The tips in the app are my own summaries of:</p><ul class="know" style="margin-bottom:16px">' + SOURCES.map(function (r) { return '<li><a href="' + r[2] + '" target="_blank" rel="noopener">' + esc(r[1]) + '</a> (' + esc(r[0]) + ')</li>'; }).join('') + '</ul>';
-    h += '<button class="btn" data-act="go" data-v="today">Done</button>';
-    return h;
+    return h + navBar('settings');
   }
 
   function daysIn(issueId, days) {
@@ -661,7 +667,7 @@
     db.entries.forEach(function (e) { rows.push({ type: 'entry', date: e.start, e: e }); });
     db.periodStarts.forEach(function (s) { rows.push({ type: 'period', date: s }); });
     rows.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
-    var h = '<button class="back" data-act="go" data-v="' + ui.histFrom + '">' + icon('back') + ' Back</button><h1 class="screen-title">All entries</h1>' +
+    var h = banner('Everything you logged', 'All entries', ui.histFrom) +
       '<p class="sub">Newest first. Tap the bin to delete something you logged by mistake. You can undo straight after.</p>';
     if (!rows.length) return h + '<div class="card empty"><p>Nothing logged yet.</p></div>';
     return h + rows.map(function (r) {
@@ -792,19 +798,20 @@ function whyFor(phase, n) {
     h += '<section class="card"><h2>Fruit in ' + MONTH_NAMES[m - 1] + '</h2>' + pills(S.fruit, 'fruit', fp ? fp.foods : null) + '</section>';
     h += '<section class="card"><h2>Imported fruit in ' + MONTH_NAMES[m - 1] + '</h2><p class="muted" style="margin-bottom:8px">Not grown here, but in season in southern Europe and elsewhere.</p>' + pills(IMPORT[m], 'import', fp ? fp.foods : null) + '</section>';
     h += '<p class="quiet" style="margin-top:8px">A general guide to Dutch-grown seasonal produce. Dates vary a little by year and by greenhouse. Not medical or dietary advice.</p>';
-    return h + navBar('today');
+    return h + navBar('eat');
   }
 
 function viewLearn() {
   var info = cycleInfo(todayIso());
   var key = info ? info.phase : 'luteal', T = PHASE_TEXT[key], ph = PHASES[key];
-  var h = '<div class="banner"><div><small>' + (ui.learnKind === 'going' ? 'More on what’s going on' : 'More on what to do') + '</small><h1>' + ph.label + ' phase</h1></div></div>';
+  var h = banner(ui.learnKind === 'going' ? 'More on what’s going on' : 'More on what to do', ph.label + ' phase', 'today');
+  if (ui.learnKind === 'going') h += '<section class="card"><h2>You may notice</h2><div class="chips">' + T.notice.map(function (n) { return '<span class="chip">' + esc(n) + '</span>'; }).join('') + '</div></section>';
   if (T.know) {
     T.know.filter(function (g) { return (g[0] === 'Body') === (ui.learnKind === 'going'); }).forEach(function (g) {
       h += '<section class="card">' + (g[0] === 'Body' ? '' : '<span class="tag ' + g[0] + ' grp">' + g[0] + '</span>') + '<ul class="know">' + g[1].map(function (k) { return '<li>' + esc(k) + '</li>'; }).join('') + '</ul></section>';
     });
   }
-  return h + '<button class="btn" data-act="go" data-v="today">Back to Today</button>' + navBar('today');
+  return h + navBar('today');
 }
 
   /* ---------- Import from notes ---------- */
@@ -924,7 +931,7 @@ function viewLearn() {
   ].join('\n');
   function viewImportNotes() {
     var r = ui.imp;
-    var h = '<button class="back" data-act="go" data-v="settings">' + icon('back') + ' Back</button><h1 class="screen-title">Import data</h1>' +
+    var h = banner('Settings', 'Import data', 'settings') +
       '<button class="btn secondary" data-act="copyPrompt">Copy a prompt for an AI</button>' +
       '<label class="btn secondary" style="display:block;text-align:center;cursor:pointer">Choose a file<input type="file" id="notesFile" accept=".txt,.csv,.tsv,text/plain,text/csv" style="display:none"></label>' +
       '<button class="btn secondary" data-act="import">Restore from backup</button>';
@@ -955,7 +962,7 @@ function viewLearn() {
     else if (v === 'addIssue') html = viewAddIssue();
     else if (v === 'history') html = viewHistory();
     else html = viewSettings();
-    app.className = (v === 'today' || v === 'patterns' || v === 'eat' || v === 'learn') ? '' : 'noNav';
+    app.className = (v === 'today' ? 'today ' : '') + ((v === 'today' || v === 'patterns' || v === 'eat' || v === 'learn' || v === 'settings') ? '' : 'noNav');
     app.innerHTML = html;
   }
 
