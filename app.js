@@ -1,0 +1,1145 @@
+/* Body tracker: a private cycle and symptom tracker.
+   All data lives in this browser (localStorage). No accounts, no servers. */
+(function () {
+  'use strict';
+
+  /* ---------- Dates ---------- */
+  var DAY = 86400000;
+  var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  var MON_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  var WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  function iso(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function parse(s) { var p = s.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  function todayIso() { return iso(new Date()); }
+  function diffDays(a, b) { return Math.round((parse(a) - parse(b)) / DAY); }
+  function addDays(s, n) { var d = parse(s); d.setDate(d.getDate() + n); return iso(d); }
+  function shortDate(s) { var d = parse(s); return d.getDate() + ' ' + MON_SHORT[d.getMonth()]; }
+  function longToday() { var d = new Date(); return WEEKDAYS[d.getDay()] + ' ' + d.getDate() + ' ' + MONTHS[d.getMonth()]; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function uid() { return Math.random().toString(36).slice(2, 10); }
+
+  /* ---------- Storage ---------- */
+  var KEY = 'healthtracker.v1';
+  function defaultIssues() {
+    return [
+      { id: 'period', name: 'My period started today', sub: 'Tap once to mark today as day 1', kind: 'period', icon: 'drop', tile: 'tile-pink', pinned: true },
+      { id: 'poop', name: 'Poo tracker', sub: 'Bristol scale, or note that you didn’t poo', kind: 'poop', icon: 'poop', tile: 'tile-orange', pinned: true },
+      { id: 'back', name: 'Back pain', kind: 'pain', icon: 'pulse', tile: 'tile-yellow', where: ['Lower back', 'Mid back', 'Upper back', 'Left side', 'Right side', 'Hips'] }
+    ];
+  }
+  /* Ready-made issues offered under "Add an issue". */
+  var PRESETS = [
+    { id: 'gut', name: 'Gut issues', sub: 'Bloating, stomach burning, nausea', kind: 'gut', icon: 'bloat', tile: 'tile-lilac', symptoms: ['Bloating', 'Stomach burning', 'Nausea'] },
+    { id: 'cystitis', name: 'Cystitis', sub: 'Rate how bad it is, 0 to 10', kind: 'pain', icon: 'cyst', tile: 'tile-blue' }
+  ];
+  function defaultDb() {
+    return { settings: { cycleLength: 28, periodLength: 5, birthControl: 'none' }, periodStarts: [], issues: defaultIssues(), entries: [] };
+  }
+  function load() {
+    try {
+      var s = JSON.parse(localStorage.getItem(KEY));
+      if (s && s.settings && s.issues && s.entries && s.periodStarts) {
+        // Keep names and subtitles of built-in issues current.
+        var canon = defaultIssues().concat(PRESETS);
+        s.issues.forEach(function (i) {
+          canon.forEach(function (c) { if (c.id === i.id) { i.name = c.name; i.sub = c.sub; i.kind = c.kind; i.pinned = !!c.pinned; } });
+        });
+        // Older entries used a 1-5 strength; convert to the 0-10 scale.
+        s.entries.forEach(function (e) { if (typeof e.strength === 'number' && e.scale !== 10) { e.strength = e.strength * 2; e.scale = 10; } });
+        // Period and Poo tracker are always present and pinned.
+        defaultIssues().filter(function (c) { return c.pinned; }).reverse().forEach(function (c) {
+          if (!s.issues.some(function (i) { return i.id === c.id; })) s.issues.unshift(c);
+        });
+        var rank = function (i) { var p = ['period', 'poop'].indexOf(i.id); return i.pinned ? (p === -1 ? 2 : p) : 3; };
+        s.issues.sort(function (a, b) { return rank(a) - rank(b); });
+        return s;
+      }
+    } catch (e) { /* ignore */ }
+    return defaultDb();
+  }
+  var db = load();
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { toast('Could not save. Storage may be full or blocked.'); } }
+  function issueById(id) { for (var i = 0; i < db.issues.length; i++) if (db.issues[i].id === id) return db.issues[i]; return null; }
+
+  /* ---------- Icons ---------- */
+  var ICONS = {
+    drop: '<path d="M12 3c3 4 6 7 6 11a6 6 0 0 1-12 0c0-4 3-7 6-11z"/>',
+    poop: '<rect x="3" y="9" width="18" height="7" rx="3.5"/>',
+    cyst: '<path d="M12 4v11M7 11l5 5 5-5M5 20h14"/>',
+    pulse: '<path d="M3 12h4l2-5 4 10 2-5h6"/>',
+    bloat: '<circle cx="12" cy="12" r="9"/><path d="M8 13c1.3-1.3 2.7 1.3 4 0s2.7 1.3 4 0"/>',
+    heart: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
+    bolt: '<path d="M13 3L5 14h6l-1 7 8-11h-6z"/>',
+    moon: '<path d="M20 14A8 8 0 1 1 10 4a6 6 0 0 0 10 10z"/>',
+    sliders: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    back: '<path d="M15 5l-7 7 7 7"/>',
+    chevR: '<path d="M9 5l7 7-7 7"/>',
+    leaf: '<path d="M5 19c0-9 5-14 14-14 0 9-5 14-14 14zM5 19l8-8"/>',
+    target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/>',
+    trend: '<path d="M3 17l6-6 4 4 8-8"/>',
+    x: '<path d="M6 6l12 12M18 6L6 18"/>',
+    trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>'
+  };
+  function icon(name) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (ICONS[name] || ICONS.pulse) + '</svg>'; }
+
+  /* ---------- Cycle maths ---------- */
+  var PHASES = {
+    period: { label: 'Period', color: 'var(--period)', hex: '#8B3A5A' },
+    follicular: { label: 'Follicular', color: 'var(--follicular)', hex: '#3F7A63' },
+    ovulation: { label: 'Ovulation', color: 'var(--ovulation)', hex: '#B8862F' },
+    luteal: { label: 'Luteal', color: 'var(--luteal)', hex: '#4B4BA0' }
+  };
+  function phaseLayout() {
+    var cl = db.settings.cycleLength, pl = Math.min(db.settings.periodLength, cl - 8);
+    var ov = cl - 14;
+    var ovStart = Math.max(pl + 1, ov - 1), ovEnd = Math.min(cl - 1, ov + 1);
+    return [
+      { key: 'period', from: 1, to: pl },
+      { key: 'follicular', from: pl + 1, to: ovStart - 1 },
+      { key: 'ovulation', from: ovStart, to: ovEnd },
+      { key: 'luteal', from: ovEnd + 1, to: cl }
+    ].filter(function (p) { return p.to >= p.from; });
+  }
+  function phaseOfDay(day) {
+    var L = phaseLayout();
+    for (var i = 0; i < L.length; i++) if (day >= L[i].from && day <= L[i].to) return L[i].key;
+    return 'luteal';
+  }
+  function lastStartOnOrBefore(d) {
+    var best = null;
+    db.periodStarts.forEach(function (s) { if (s <= d && (!best || s > best)) best = s; });
+    return best;
+  }
+  function cycleInfo(dateIso) {
+    var st = lastStartOnOrBefore(dateIso);
+    if (!st) return null;
+    var cl = db.settings.cycleLength;
+    var raw = diffDays(dateIso, st) + 1;
+    var late = raw > cl;
+    var day = late ? cl : raw;
+    return { start: st, rawDay: raw, day: day, late: late, phase: late ? 'luteal' : phaseOfDay(day), toPeriod: cl - raw + 1, cl: cl };
+  }
+  function isHormonal() { return ['combined', 'progestin', 'patch', 'hiud', 'implant', 'injection'].indexOf(db.settings.birthControl) !== -1; }
+
+  var PHASE_TEXT = {
+    period: {
+      likely: 'Hormone levels are at their lowest and the lining of the womb is shedding. Cramps, tiredness and a dip in energy are common.',
+      notice: ['Cramps', 'Lower back ache', 'Tiredness', 'Headache', 'Heavier flow', 'Low mood'],
+      know: [
+        ['Body', ['The length, heaviness and pain of your period can reflect how the past month went', 'Very painful, heavy or missing periods are worth talking to a doctor about']],
+        ['Eat', ['Iron-rich foods: lentils, red meat, dark leafy greens', 'Anti-inflammatory foods may help']],
+        ['Sleep', ['Lie down and rest instead of pushing through']],
+        ['Mind', ['Good for planning and reflecting: lists, big-picture thinking', 'Do not force social events or presentations']]
+      ],
+      todo: [
+        ['Eat', 'Iron-rich foods like lentils, eggs and leafy greens, with something vitamin C-rich alongside to help absorption.'],
+        ['Move', 'Gentle walks or stretching. Heat on your belly or back can ease cramps.'],
+        ['Sleep', 'You may need a little more rest. An earlier night can help.'],
+        ['Mind', 'Be kind to yourself. It is fine to say no to extras.'],
+        ['Plan', 'Keep the first couple of days light if you can.']
+      ]
+    },
+    follicular: {
+      likely: 'Oestrogen is rising. Energy, focus and mood often pick up, and skin tends to feel calmer.',
+      notice: ['Rising energy', 'Clearer head', 'Better mood', 'Feeling social'],
+      know: [
+        ['Eat', ['Iron-rich foods to replace what you lost: lentils, red meat, dark leafy greens']],
+        ['Move', ['Good time for harder workouts']],
+        ['Mind', ['Motivation and clarity tend to rise', 'Good for demanding projects, social plans and learning something new', 'Brainstorming and drafting feel easier']]
+      ],
+      todo: [
+        ['Eat', 'Fresh, lighter meals with plenty of vegetables, plus protein to rebuild after your period.'],
+        ['Move', 'A good time to try something new or push a little harder.'],
+        ['Sleep', 'Sleep is often deeper now. Keep a steady bedtime.'],
+        ['Mind', 'Good days for learning, starting things and making plans.'],
+        ['Plan', 'Schedule the demanding or social things here.']
+      ]
+    },
+    ovulation: {
+      likely: 'Oestrogen peaks and an egg is released. Many people feel energetic and social. Some notice a one-sided twinge or more discharge.',
+      notice: ['High energy', 'One-sided twinge', 'More discharge', 'Higher libido'],
+      know: [
+        ['Move', ['Intense workouts often feel good']],
+        ['Mind', ['Energy and confidence often peak', 'Good for presentations and negotiations', 'Watch for impulsive spending, snacking or decisions', 'Save pitches and social plans for now, not lonely, dull work']]
+      ],
+      todo: [
+        ['Eat', 'Fibre, fruit and veg, and plenty of water.'],
+        ['Move', 'Strong, energetic workouts often feel good. Warm up well.'],
+        ['Sleep', 'Sleep can be a little lighter. Keep evenings calm.'],
+        ['Mind', 'Confidence is often high, so good timing for important conversations.'],
+        ['Plan', 'Make the most of the extra energy.']
+      ]
+    },
+    luteal: {
+      likely: 'Progesterone is high, then starts to fall. Energy and mood can dip, sleep gets lighter, and bloating or sore breasts are common.',
+      notice: ['Bloating', 'Sore breasts', 'Cravings', 'Lighter sleep', 'Low energy', 'Irritability'],
+      know: [
+        ['Body', ['Early: progesterone rises, so you feel warmer, sleepier and hungrier', 'Digestion slows, so bloating and constipation are common', 'Late: hormones drop before your period, which can feel turbulent', 'You burn a bit more energy and blood sugar is touchier', 'Cardio feels harder than usual', 'Stress tolerance may be lower', 'Low progesterone, often from stress or undereating, can bring anxiety or irritability']],
+        ['Eat', ['Warm meals with slow carbs (sweet potato, oats)', 'Add protein and magnesium-rich foods', 'Pair carbs with protein or fat', 'Eat every 3 to 4 hours, do not skip meals', 'Less caffeine late in the phase if PMS is strong', 'Cut back on alcohol and ultra-processed food, which can worsen PMS', 'Protein- and fibre-rich snacks steady blood sugar', 'Healthy fats (seeds, avocado, olive oil) support hormones']],
+        ['Move', ['Steady cardio instead of HIIT', 'Moderate weights, more reps', 'Take an extra rest day if you need it']],
+        ['Sleep', ['Earlier bedtime, a calm wind-down', 'You may need more sleep, and that is normal', 'Aim for 7 to 9 hours']],
+        ['Mind', ['Feeling more sensitive or less social is common', 'Strong feelings are not always "just hormones"', 'Ask what the feeling is telling you', 'Good time to notice what drains you and set boundaries', 'Journal instead of pushing the feeling away', 'Stress and poor sleep hit harder now, so rest more and say no more often', 'Cut back on social commitments', 'Delay big decisions if emotions run high']],
+        ['Plan', ['Finish demanding tasks early', 'Tidy up and prepare for your period', 'Organise your home and routines', 'Keep the first days of your period light']]
+      ],
+      todo: [
+        ['Eat', 'Eat regularly, pairing carbs with protein or fat. Add fibre and magnesium-rich foods like greens, nuts and seeds, and go easy on salt if you bloat.'],
+        ['Move', 'Keep it gentle: walks, yoga, lighter strength sessions. Steady cardio and moderate weights suit better than HIIT. Hard cardio can feel tougher now.'],
+        ['Sleep', 'Keep a steady bedtime and a cool room. Sleep can get lighter before your period.'],
+        ['Mind', 'Mood can dip, so go easy on yourself and avoid stacking demanding plans.'],
+        ['Plan', 'Finish demanding tasks early and keep the first two days of your period light if you can.']
+      ]
+    }
+  };
+
+  /* ---------- Entries ---------- */
+  function entryDays(e, limitIso) {
+    var out = [], t = limitIso || todayIso();
+    var end = e.end || t;
+    if (end > t) end = t;
+    var d = e.start, n = 0;
+    while (d <= end && n < 400) { out.push(d); d = addDays(d, 1); n++; }
+    return out;
+  }
+  function dayLevels(onlyIssueId) {
+    var map = {};
+    db.entries.forEach(function (e) {
+      if (onlyIssueId && e.issueId !== onlyIssueId) return;
+      entryDays(e).forEach(function (d) { if (!map[d] || map[d] < e.level) map[d] = e.level; });
+    });
+    return map;
+  }
+  function firstDataDate() {
+    var first = null;
+    db.entries.forEach(function (e) { if (!first || e.start < first) first = e.start; });
+    db.periodStarts.forEach(function (s) { if (!first || s < first) first = s; });
+    return first;
+  }
+  function lastLoggedText(issueId) {
+    var last = null;
+    db.entries.forEach(function (e) { if (e.issueId === issueId) { var d = e.end || todayIso(); if (!last || d > last) last = d; } });
+    if (!last) return 'Not logged yet';
+    var n = diffDays(todayIso(), last);
+    return n <= 0 ? 'Last logged today' : n === 1 ? 'Last logged yesterday' : 'Last logged ' + n + ' days ago';
+  }
+  function levelFor(issue, draft) {
+    if (issue.kind === 'bloat') return draft.bloat || 2;
+    if (issue.kind === 'poop') return draft.noPoo ? 2 : { 1: 3, 2: 2, 3: 1, 4: 1, 5: 2, 6: 3, 7: 3 }[draft.bristol] || 1;
+    var s = typeof draft.strength === 'number' ? draft.strength : 5;
+    return s <= 3 ? 1 : s <= 6 ? 2 : 3;
+  }
+
+  /* ---------- UI state ---------- */
+  var ui = { view: 'today', patMonth: null, patIssue: null, patCycle: true, eatMonth: null, draft: null };
+  var app = document.getElementById('app');
+
+  function go(view, extra) {
+    if (view === 'settings') ui.bcOpen = false;
+    if (view === 'eat') ui.eatMore = false;
+    ui.view = view;
+    if (extra) for (var k in extra) ui[k] = extra[k];
+    render();
+    window.scrollTo(0, 0);
+  }
+
+  var toastTimer = null, toastUndo = null;
+  function toast(msg, undoFn) {
+    var el = document.getElementById('toast');
+    toastUndo = undoFn || null;
+    el.innerHTML = '<span>' + esc(msg) + '</span>' + (undoFn ? '<button data-act="undo">Undo</button>' : '');
+    el.className = 'show';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.className = ''; }, 4500);
+  }
+
+  /* ---------- Views ---------- */
+  function navBar(active) {
+    return '<nav class="nav">' +
+      '<button class="slot-l ' + (active === 'today' ? 'on' : '') + '" data-act="go" data-v="today">' + icon('target') + 'Today</button>' +
+      '<button class="fab" data-act="go" data-v="log" aria-label="Log something">' + icon('plus') + '</button>' +
+      '<button class="slot-r ' + (active === 'patterns' ? 'on' : '') + '" data-act="go" data-v="patterns">' + icon('trend') + 'Patterns</button>' +
+      '</nav>';
+  }
+
+  function arc(cx, cy, r, a0, a1) {
+    function p(a) { var t = (a - 90) * Math.PI / 180; return [cx + r * Math.cos(t), cy + r * Math.sin(t)]; }
+    var s = p(a0), e = p(a1), large = (a1 - a0) > 180 ? 1 : 0;
+    return 'M' + s[0].toFixed(2) + ' ' + s[1].toFixed(2) + ' A' + r + ' ' + r + ' 0 ' + large + ' 1 ' + e[0].toFixed(2) + ' ' + e[1].toFixed(2);
+  }
+  function donut(info) {
+    var cl = info.cl, per = 360 / cl, gap = 3, parts = '';
+    phaseLayout().forEach(function (ph) {
+      var a0 = (ph.from - 1) * per + gap / 2, a1 = ph.to * per - gap / 2;
+      parts += '<path d="' + arc(150, 150, 108, a0, a1) + '" stroke="' + PHASES[ph.key].hex + '" stroke-width="30" fill="none"/>';
+    });
+    var ma = (info.day - 0.5) * per, t = (ma - 90) * Math.PI / 180;
+    var mx = 150 + 108 * Math.cos(t), my = 150 + 108 * Math.sin(t);
+    return '<svg class="donut" viewBox="0 0 300 300" role="img" aria-label="Cycle day ' + info.rawDay + ' of about ' + cl + '">' + parts +
+      '<circle cx="' + mx.toFixed(1) + '" cy="' + my.toFixed(1) + '" r="13" fill="#fff" stroke="' + PHASES[info.phase].hex + '" stroke-width="3"/>' +
+      '<text x="150" y="152" text-anchor="middle" font-size="44" font-weight="700" fill="#2A2433">Day ' + info.rawDay + '</text>' +
+      '<text x="150" y="182" text-anchor="middle" font-size="16" fill="#5F5868">of about ' + cl + '</text></svg>';
+  }
+
+  /* ---------- Moon ring and hormone chart ---------- */
+  function moonPath(cx, cy, r, k, waning) {
+    if (k <= 0.02) return '';
+    if (k >= 0.98) return 'M' + (cx - r) + ' ' + cy + 'A' + r + ' ' + r + ' 0 1 1 ' + (cx + r) + ' ' + cy + 'A' + r + ' ' + r + ' 0 1 1 ' + (cx - r) + ' ' + cy + 'Z';
+    var rx = Math.abs(1 - 2 * k) * r, top = cy - r, bot = cy + r, s = waning ? -1 : 1;
+    var x = cx;
+    // lit side is right (waxing) or left (waning)
+    var outer = 'M' + x + ' ' + top + 'A' + r + ' ' + r + ' 0 0 ' + (waning ? 0 : 1) + ' ' + x + ' ' + bot;
+    var sweep = k < 0.5 ? (waning ? 1 : 0) : (waning ? 0 : 1);
+    return outer + 'A' + rx.toFixed(2) + ' ' + r + ' 0 0 ' + sweep + ' ' + x + ' ' + top + 'Z';
+  }
+  function moonRing(info, whenShort) {
+    var cl = info.cl, R = 140, C = 170, mr = Math.min(13.5, 0.4 * 2 * Math.PI * R / cl), parts = '';
+    for (var d = 1; d <= cl; d++) {
+      var a = (d - 0.5) / cl * 2 * Math.PI - Math.PI / 2, cx = C + R * Math.cos(a), cy = C + R * Math.sin(a);
+      var f = (d - 0.5) / cl, k = (1 - Math.cos(f * 2 * Math.PI)) / 2, waning = f > 0.5;
+      var col = PHASES[phaseOfDay(d)].hex;
+      parts += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="' + mr.toFixed(1) + '" fill="#FBF3EA" stroke="' + col + '" stroke-width="2"/>';
+      var p = moonPath(0, 0, mr - 1, k, waning);
+      if (p) parts += '<path transform="translate(' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ')" d="' + p + '" fill="' + col + '"/>';
+      if (d === info.day) parts += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="' + (mr + 6).toFixed(1) + '" fill="none" stroke="#2A2433" stroke-width="3"/>';
+    }
+    var ph = PHASES[info.phase];
+    return '<svg class="donut" viewBox="0 0 340 340" role="img" aria-label="Cycle day ' + info.rawDay + ' of about ' + cl + ', ' + ph.label + ' phase">' + parts +
+      '<text x="170" y="138" text-anchor="middle" font-size="15" font-weight="700" letter-spacing="2" fill="' + ph.hex + '">' + ph.label.toUpperCase() + ' PHASE</text>' +
+      '<text x="170" y="192" text-anchor="middle" font-size="56" font-weight="700" fill="#2A2433">Day ' + info.rawDay + '</text>' +
+      '<text x="170" y="224" text-anchor="middle" font-size="16" fill="#2A2433">' + esc(whenShort) + '</text></svg>';
+  }
+  function gauss(t, mu, sl, sr) { var s = t < mu ? sl : sr, z = (t - mu) / s; return Math.exp(-z * z / 2); }
+  var HORMONES = [
+    { key: 'Estrogen', hex: '#8B3A5A', area: true, f: function (t, od) { return 0.1 + 0.9 * gauss(t, od - 1, 4.4, 2) + 0.5 * gauss(t, od + 7, 3.6, 3.6); } },
+    { key: 'Progesterone', hex: '#4B4BA0', area: true, f: function (t, od) { return 0.03 + 0.85 * gauss(t, od + 7, 3.4, 3.6); } },
+    { key: 'Testosterone', hex: '#B8862F', area: false, f: function (t, od) { return 0.2 + 0.14 * gauss(t, od, 3, 3); } },
+    { key: 'LH', hex: '#3F7A63', area: true, f: function (t, od) { return 0.04 + 0.96 * gauss(t, od - 0.5, 0.9, 0.9); } }
+  ];
+  function hormoneNote(info) {
+    var od = info.cl - 14, d = info.rawDay;
+    if (info.late) return 'Your period is a little late, so hormone levels are likely still low and about to turn over.';
+    if (info.phase === 'period') return 'Both main hormones are at their lowest, which is why energy can dip.';
+    if (info.phase === 'follicular') return 'Estrogen is climbing, which often brings more energy and a clearer head.';
+    if (info.phase === 'ovulation') return 'Estrogen peaks and LH spikes briefly, which triggers ovulation.';
+    return d <= od + 8 ? 'Progesterone is rising and high, which can make you warmer, sleepier and hungrier.' : 'Both main hormones are falling before your period.';
+  }
+  function hormoneCard(info) {
+    var cl = info.cl, od = cl - 14, W = 340, H = 150, x0 = 4, x1 = W - 4, yb = 130, yt = 14;
+    function X(t) { return x0 + (t - 1) / (cl - 1) * (x1 - x0); }
+    function Y(v) { return yb - v * (yb - yt); }
+    var svg = '', i, t, pts, dpath;
+    HORMONES.forEach(function (hm) {
+      var line = '';
+      for (t = 1, i = 0; t <= cl + 0.001; t += 0.25, i++) line += (i ? 'L' : 'M') + X(t).toFixed(1) + ' ' + Y(hm.f(t, od)).toFixed(1);
+      if (hm.area) svg += '<path d="' + line + 'L' + X(cl).toFixed(1) + ' ' + yb + 'L' + X(1).toFixed(1) + ' ' + yb + 'Z" fill="' + hm.hex + '" opacity="0.14"/>';
+      svg += '<path d="' + line + '" fill="none" stroke="' + hm.hex + '" stroke-width="2.5" stroke-linejoin="round"/>';
+    });
+    var mx = X(Math.min(info.day, cl)).toFixed(1);
+    svg += '<line x1="' + mx + '" y1="' + (yt - 2) + '" x2="' + mx + '" y2="' + yb + '" stroke="#2A2433" stroke-width="2"/><circle cx="' + mx + '" cy="' + (yt - 2) + '" r="5" fill="#2A2433"/>';
+    var bars = phaseLayout().map(function (p) {
+      var a = X(p.from - 0.5 < 1 ? 1 : p.from - 0.5), b = X(p.to + 0.5 > cl ? cl : p.to + 0.5);
+      return '<rect x="' + (a + 1).toFixed(1) + '" y="' + (yb + 10) + '" width="' + Math.max(2, b - a - 2).toFixed(1) + '" height="8" rx="4" fill="' + PHASES[p.key].hex + '"/>';
+    }).join('');
+    var legend = HORMONES.map(function (hm) { return '<span><i style="background:' + hm.hex + '"></i>' + hm.key + '</span>'; }).join('');
+    return '<section class="hero hormones"><h2>Your hormones</h2><div class="legend" style="justify-content:flex-start;margin:6px 0 8px">' + legend + '</div>' +
+      '<svg viewBox="0 0 ' + W + ' ' + (H + 10) + '" class="hchart" role="img" aria-label="Typical hormone levels across your cycle">' + svg + bars + '</svg>' +
+      '<p class="muted" style="text-align:left;margin-top:8px;font-size:15px">' + esc(hormoneNote(info)) + '</p>' +
+      '<p class="muted" style="text-align:left;margin-top:6px;font-size:12.5px">' + (isHormonal() ? 'A typical natural cycle, not your own levels. Hormonal birth control changes this pattern.' : 'A typical cycle, not your own measured levels.') + '</p></section>';
+  }
+
+  function hasGroups(T, body) { return !!T.know && T.know.some(function (g) { return (g[0] === 'Body') === body; }); }
+  function viewToday() {
+    var info = cycleInfo(todayIso());
+    var h = '<div class="banner"><div><small>' + esc(longToday()) + '</small><h1>Today</h1></div>' +
+      '<button class="round-btn" data-act="go" data-v="settings" aria-label="Settings">' + icon('sliders') + '</button></div>';
+    if (!info) {
+      return h + '<div class="card setup"><h2>When did your last period start?</h2><p>Add the first day and I will work out where you are in your cycle. You can change it any time.</p>' +
+        '<input type="date" id="firstStart" max="' + todayIso() + '" value="' + todayIso() + '">' +
+        '<button class="btn" data-act="firstStart">Save</button></div>' +
+        '<p class="quiet">Your data stays on this device.</p>' + navBar('today');
+    }
+    var T = PHASE_TEXT[info.phase], ph = PHASES[info.phase];
+    var when;
+    if (info.late) when = 'Your period may be a few days late';
+    else if (info.phase === 'period') when = 'Period day ' + info.rawDay + ' of about ' + db.settings.periodLength;
+    else when = 'Period likely in about ' + info.toPeriod + (info.toPeriod === 1 ? ' day' : ' days');
+    var legend = phaseLayout().map(function (p) { return '<span><i style="background:' + PHASES[p.key].hex + '"></i>' + PHASES[p.key].label + '</span>'; }).join('');
+    var whenShort = info.late ? 'Period may be late' : info.phase === 'period' ? 'Period day ' + info.rawDay + ' of about ' + db.settings.periodLength : 'Period in about ' + info.toPeriod + (info.toPeriod === 1 ? ' day' : ' days');
+    h += '<section class="hero">' + moonRing(info, whenShort) + '</section>';
+    h += hormoneCard(info);
+    if (isHormonal()) h += '<div class="card"><p><b>Hormonal method:</b> phases are only a rough guide because your hormones are steadier than a natural cycle.</p></div>';
+    h += '<section class="card"><h2>What’s likely going on</h2><p>' + esc(T.likely) + '</p>' + (hasGroups(T, true) ? '<button class="more" data-act="learn" data-k="going">See more ' + icon('chevR') + '</button>' : '') + '</section>';
+    h += '<section class="card"><h2>You may notice</h2><div class="chips">' + T.notice.map(function (n) { return '<span class="chip">' + esc(n) + '</span>'; }).join('') + '</div></section>';
+    h += '<section class="card"><h2>Worth doing these days</h2>' + T.todo.map(function (r) { return '<div class="do-row"><span class="tag ' + r[0] + '">' + r[0] + '</span><p>' + esc(T.know ? r[1].split('. ')[0].replace(/\.$/, '') + '.' : r[1]) + '</p></div>'; }).join('') + (hasGroups(T, false) ? '<button class="more" data-act="learn" data-k="do">See more ' + icon('chevR') + '</button>' : '') + '</section>';
+    h += '<section class="card" style="padding:12px 16px"><button class="big-row" style="margin:0" data-act="go" data-v="eat"><span class="icon-tile tile-green">' + icon('leaf') + '</span><span><span class="t">What to eat</span><span class="s">Seasonal food that suits your phase</span></span><span class="chev">' + icon('chevR') + '</span></button></section>';
+    h += '<p class="quiet" style="margin-top:8px">General wellbeing tips, not medical advice. If pain is severe or unusual for you, talk to a doctor.</p>';
+    return h + navBar('today');
+  }
+
+  function viewLog() {
+    function row(i) {
+      var sub = (i.pinned && i.sub) ? i.sub : lastLoggedText(i.id);
+      return '<button class="big-row" data-act="pick" data-id="' + esc(i.id) + '"><span class="icon-tile ' + i.tile + '">' + icon(i.icon) + '</span><span><span class="t">' + esc(i.name) + '</span><span class="s">' + esc(sub) + '</span></span>' +
+        (i.kind === 'period' || i.kind === 'tap' ? '' : '<span class="chev">' + icon('chevR') + '</span>') + '</button>';
+    }
+    var pinned = db.issues.filter(function (i) { return i.pinned; });
+    var yours = db.issues.filter(function (i) { return !i.pinned; });
+    var h = '<div class="sheet-head"><h1>What’s worth noting?</h1><button class="x" data-act="go" data-v="today" aria-label="Close">' + icon('x') + '</button></div>' +
+      '<p class="sub" style="margin-top:8px">Everything here is optional. Only log what you want to remember.</p>' +
+      '<div class="section-h" style="color:var(--muted);font-weight:500">Pinned</div>' + pinned.map(row).join('');
+    h += '<div class="section-h" style="color:var(--muted);font-weight:500">Your issues</div>' + yours.map(row).join('');
+    h += '<button class="dashed" data-act="addIssue">' + icon('plus') + ' Add an issue</button>';
+    h += '<p class="quiet">No streaks, no reminders. Nothing is ever overdue.</p>';
+    return h;
+  }
+
+  var BRISTOL = [
+    [1, 'Separate hard lumps', 'Constipated'],
+    [2, 'Lumpy sausage', 'Leaning constipated'],
+    [3, 'Sausage with cracks', 'Typical'],
+    [4, 'Smooth, soft sausage', 'Typical'],
+    [5, 'Soft blobs', 'Leaning loose'],
+    [6, 'Mushy, ragged pieces', 'Loose'],
+    [7, 'Watery, no solid pieces', 'Diarrhoea']
+  ];
+  function bristolArt(n) {
+    var c = '#7A4A26', s;
+    if (n === 1) s = '<circle cx="8" cy="12" r="4" fill="' + c + '"/><circle cx="22" cy="12" r="4" fill="' + c + '"/><circle cx="36" cy="12" r="4" fill="' + c + '"/>';
+    else if (n === 2) s = '<rect x="4" y="6" width="36" height="12" rx="6" fill="' + c + '"/><path d="M12 6v12M22 6v12M31 6v12" stroke="#F4E6D7" stroke-width="2"/>';
+    else if (n === 3) s = '<rect x="4" y="6" width="36" height="12" rx="6" fill="' + c + '"/><path d="M14 6l2 5M26 18l2-5" stroke="#F4E6D7" stroke-width="2"/>';
+    else if (n === 4) s = '<rect x="4" y="6" width="36" height="12" rx="6" fill="' + c + '"/>';
+    else if (n === 5) s = '<ellipse cx="9" cy="12" rx="5" ry="5" fill="' + c + '"/><ellipse cx="22" cy="12" rx="5" ry="5" fill="' + c + '"/><ellipse cx="35" cy="12" rx="5" ry="5" fill="' + c + '"/>';
+    else if (n === 6) s = '<path d="M4 18c2-10 8-14 14-8 4-8 12-6 14 2 3-2 7 2 8 6z" fill="' + c + '"/>';
+    else s = '<path d="M3 14c6-6 8 2 13-2s8 4 13 0 8 2 12-2v7H3z" fill="' + c + '" opacity=".8"/>';
+    return '<svg viewBox="0 0 44 24" aria-hidden="true">' + s + '</svg>';
+  }
+
+  function calendarHtml(d) {
+    var m = d.calMonth.split('-'), y = +m[0], mo = +m[1] - 1;
+    var first = new Date(y, mo, 1), startOffset = (first.getDay() + 6) % 7;
+    var days = new Date(y, mo + 1, 0).getDate(), t = todayIso();
+    var thisMonth = t.slice(0, 7) === d.calMonth;
+    var cells = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(function (w) { return '<div class="dow">' + w + '</div>'; }).join('');
+    for (var i = 0; i < startOffset; i++) cells += '<div></div>';
+    for (var n = 1; n <= days; n++) {
+      var ds = y + '-' + pad(mo + 1) + '-' + pad(n), cls = '', dis = ds > t;
+      var end = d.end || (d.ongoing ? t : d.start);
+      if (ds === d.start || ds === d.end) cls = 'sel';
+      else if (d.start && ds > d.start && ds < end) cls = 'mid';
+      if (ds === t && !cls) cls = 'today';
+      cells += '<button class="' + cls + '" ' + (dis ? 'disabled' : 'data-act="day" data-d="' + ds + '"') + '>' + n + '</button>';
+    }
+    return '<div class="cal"><div class="cal-head"><button data-act="month" data-n="-1" aria-label="Previous month">' + icon('back') + '</button><span>' + MONTHS[mo] + ' ' + y + '</span>' +
+      '<button data-act="month" data-n="1" ' + (thisMonth ? 'disabled' : '') + ' aria-label="Next month">' + icon('chevR') + '</button></div><div class="cal-grid">' + cells + '</div></div>';
+  }
+  function whenText(d) {
+    if (d.ongoing) return shortDate(d.start) + ' to now, ongoing';
+    if (!d.end || d.end === d.start) return shortDate(d.start);
+    return shortDate(d.start) + ' to ' + shortDate(d.end);
+  }
+  function insightText(issue) {
+    var cl = db.settings.cycleLength, since = addDays(todayIso(), -cl * 3);
+    var list = db.entries.filter(function (e) { return e.issueId === issue.id && e.start >= since; });
+    if (!list.length) return '';
+    var cycles = Math.max(1, Math.min(3, Math.ceil(diffDays(todayIso(), firstDataDate() || todayIso()) / cl) || 1));
+    var durs = list.map(function (e) { return entryDays(e).length; });
+    var lo = Math.min.apply(null, durs), hi = Math.max.apply(null, durs);
+    var txt;
+    if (issue.kind === 'bloat') {
+      var totalDays = durs.reduce(function (a, b) { return a + b; }, 0);
+      txt = 'So far: ' + totalDays + (totalDays === 1 ? ' day' : ' days') + ' in ' + cycles + (cycles === 1 ? ' cycle' : ' cycles');
+      var pre = list.filter(function (e) { var c = cycleInfo(e.start); return c && c.rawDay > cl - 7; }).length;
+      if (db.periodStarts.length && pre / list.length >= 0.6) txt += ', mostly before your period';
+    } else {
+      txt = 'So far: ' + list.length + (list.length === 1 ? ' time' : ' times') + ' in ' + cycles + (cycles === 1 ? ' cycle' : ' cycles') + ', usually ' + (lo === hi ? lo : lo + ' to ' + hi) + (hi === 1 ? ' day' : ' days');
+    }
+    return '<div class="insight">' + esc(txt) + '</div>';
+  }
+
+  function viewIssue() {
+    var d = ui.draft, issue = issueById(d.issueId);
+    var ci = cycleInfo(todayIso());
+    var h = '<button class="back" data-act="go" data-v="log">' + icon('back') + ' Back</button>' +
+      '<h1 class="screen-title">' + esc(issue.name) + '</h1>' +
+      '<p class="sub">' + (ci ? 'Cycle day ' + ci.rawDay + ' is added for you.' : 'Add a few details if you like.') + '</p>';
+    h += insightText(issue);
+
+    if (issue.kind === 'poop') {
+      h += '<button class="btn-outline warn ' + (d.noPoo ? 'on' : '') + '" style="margin-top:18px" data-act="noPoo">' + (d.noPoo ? '✓ ' : '') + 'I didn’t poo</button>';
+    }
+    if (issue.kind === 'poop' && !d.noPoo) {
+      h += '<div class="label">What did it look like?</div>';
+      h += BRISTOL.map(function (b) { return '<button class="bristol t-' + ({ 1: 'red', 2: 'yellow', 3: 'green', 4: 'green', 5: 'yellow', 6: 'red', 7: 'red' }[b[0]]) + ' ' + (d.bristol === b[0] ? 'on' : '') + '" data-act="bristol" data-n="' + b[0] + '"><span class="art">' + bristolArt(b[0]) + '</span><span><span class="n">' + b[1] + '</span><span class="d">' + b[2] + '</span></span></button>'; }).join('');
+    }
+    if (issue.where && issue.where.length) {
+      h += '<div class="label">Where</div><div class="opts">' + issue.where.map(function (w) { return '<button class="opt ' + (d.where === w ? 'on' : '') + '" data-act="where" data-w="' + esc(w) + '">' + esc(w) + '</button>'; }).join('') + '</div>';
+    }
+    if (issue.symptoms && issue.symptoms.length) {
+      h += '<div class="label">What are you feeling? Pick any</div><div class="opts">' + issue.symptoms.map(function (s) { return '<button class="opt ' + (d.symptoms.indexOf(s) !== -1 ? 'on' : '') + '" data-act="symptom" data-s="' + esc(s) + '">' + esc(s) + '</button>'; }).join('') + '</div>';
+    }
+    if (issue.kind === 'pain' || issue.kind === 'custom' || issue.kind === 'gut') {
+      var word = d.strength === 0 ? 'None' : d.strength <= 3 ? 'Mild' : d.strength <= 6 ? 'Medium' : 'Strong';
+      h += '<div class="strong-label"><span>' + (issue.kind === 'pain' ? 'How bad is the pain' : 'How strong') + '</span><b id="strengthLabel">' + word + '</b></div>';
+      h += '<div class="slider-wrap"><div class="bubble" id="bubble" style="--v:' + d.strength + '">' + d.strength + '</div>' +
+        '<input type="range" class="slider" min="0" max="10" step="1" value="' + d.strength + '" data-range="strength" aria-label="Strength from 0 to 10"></div>';
+      h += '<div class="scale-cap"><span>' + (issue.kind === 'pain' ? 'No pain' : 'None') + '</span><span>' + (issue.kind === 'pain' ? 'Worst ever' : 'Worst ever') + '</span></div>';
+    }
+    if (issue.kind === 'bloat') {
+      h += '<div class="label">How bloated</div><div class="scale scale3">' + [[1, 'Mild'], [2, 'Noticeable'], [3, 'Heavy']].map(function (o) { return '<button class="opt ' + (d.bloat === o[0] ? 'on' : '') + '" data-act="bloat" data-n="' + o[0] + '">' + o[1] + '</button>'; }).join('') + '</div>';
+    }
+    h += '<div class="label" style="margin-bottom:4px">When did you have it</div><div class="when">' + esc(whenText(d)) + '</div><p class="sub" style="margin:2px 0 0">Tap a day to start a new range.</p>';
+    h += calendarHtml(d);
+    h += '<button class="btn-outline ' + (d.ongoing ? 'on' : '') + '" data-act="ongoing">Still going, no end date</button>';
+    h += '<div class="label">Note for yourself</div><textarea data-input="note" placeholder="What you ate, stress, travel, anything">' + esc(d.note) + '</textarea>';
+    h += '<button class="btn" data-act="saveEntry">Save</button>';
+    return h;
+  }
+
+  function viewAddIssue() {
+    var d = ui.draft;
+    var tiles = ISSUE_TILES;
+    var presets = PRESETS.map(function (p) {
+      var added = !!issueById(p.id);
+      return '<button class="big-row" ' + (added ? 'disabled style="opacity:.55"' : 'data-act="addPreset" data-id="' + p.id + '"') + '><span class="icon-tile ' + p.tile + '">' + icon(p.icon) + '</span><span><span class="t">' + esc(p.name) + '</span><span class="s">' + esc(added ? 'Already added' : p.sub) + '</span></span>' +
+        (added ? '' : '<span class="chev">' + icon('plus') + '</span>') + '</button>';
+    }).join('');
+    return '<button class="back" data-act="go" data-v="log">' + icon('back') + ' Back</button><h1 class="screen-title">Add an issue</h1>' +
+      '<p class="sub">Pick a ready-made one, or make your own.</p>' +
+      '<div class="section-h" style="color:var(--muted);font-weight:500">Ready-made</div>' + presets +
+      '<div class="section-h" style="color:var(--muted);font-weight:500;margin-top:26px">Or make your own</div>' +
+      '<div class="label" style="margin-top:6px">Name</div><input type="text" data-input="name" maxlength="40" placeholder="e.g. Headache" value="' + esc(d.name) + '">' +
+      '<div class="label">Icon</div><div class="icon-pick">' + tiles.map(function (t, i) { return '<button class="' + (d.tileIdx === i ? 'on' : '') + '" data-act="tile" data-n="' + i + '" aria-label="Icon ' + (i + 1) + '"><span class="icon-tile ' + t[1] + '">' + icon(t[0]) + '</span></button>'; }).join('') + '</div>' +
+      '<button class="btn" data-act="saveIssue">Add issue</button>';
+  }
+  var ISSUE_TILES = [['pulse', 'tile-yellow'], ['bloat', 'tile-lilac'], ['heart', 'tile-pink'], ['bolt', 'tile-orange'], ['moon', 'tile-blue']];
+
+  var BC = [
+    ['none', 'None', 'Natural cycle', 'Cycle phases and phase-based tips work as shown.'],
+    ['combined', 'Combined pill', 'Hormonal method', 'Hormones keep ovulation quiet, so phases are only a rough guide. The monthly bleed is a withdrawal bleed.'],
+    ['progestin', 'Progestin-only pill', 'Hormonal method', 'Ovulation and bleeding can vary a lot, so phases are only a rough guide.'],
+    ['patch', 'Patch or ring', 'Hormonal method', 'Hormones keep ovulation quiet, so phases are only a rough guide.'],
+    ['hiud', 'Hormonal IUD', 'Hormonal method', 'Bleeding often gets lighter or stops. Phases are only a rough guide.'],
+    ['copper', 'Copper IUD', 'Natural cycle', 'Your hormones are not changed, so phases and tips work as shown. Periods can be heavier.'],
+    ['implant', 'Implant', 'Hormonal method', 'Bleeding can be irregular, so phases are only a rough guide.'],
+    ['injection', 'Injection', 'Hormonal method', 'Bleeding often becomes irregular or stops. Phases are only a rough guide.'],
+    ['other', 'Other or not sure', 'Rough guide', 'Phases are shown as a rough guide.']
+  ];
+  var SOURCES = [
+    ['Roots to Leaves', 'If Your Luteal Phase Sucks, Then Read This', 'https://rootstoleaves.substack.com/p/if-your-luteal-phase-sucks-then-read'],
+    ['Sabrina Rose', 'The Transformative Power of the Luteal Phase', 'https://moonbeambysabrina.substack.com/p/the-transformative-power-of-the-luteal'],
+    ['Bhielle', 'softening into your luteal phase', 'https://bhielle.substack.com/p/softening-into-your-luteal-phase'],
+    ['Valerie Ribon', 'Your Cycle Gives You Superpowers (A Guide)', 'https://valerieribon.substack.com/p/your-cycle-gives-you-superpowers'],
+    ['Sophie Trotman', '10 Things I Wish Women Knew About Their Menstrual Cycle', 'https://sophietrotmannutrition.substack.com/p/10-things-i-wish-women-knew-about']
+  ];
+  function viewSettings() {
+    var s = db.settings, cur = BC.filter(function (b) { return b[0] === s.birthControl; })[0] || BC[0];
+    var h = '<button class="back" data-act="go" data-v="today">' + icon('back') + ' Back</button><h1 class="screen-title">Settings</h1>' +
+      '<div class="label" style="margin-top:14px">Your cycle</div><div class="stepper-card">' +
+      '<div class="stepper"><span>Cycle length</span><span class="ctl"><button data-act="step" data-k="cycleLength" data-n="-1" aria-label="Shorter">−</button><span>' + s.cycleLength + ' days</span><button data-act="step" data-k="cycleLength" data-n="1" aria-label="Longer">+</button></span></div>' +
+      '<div class="stepper"><span>Period length</span><span class="ctl"><button data-act="step" data-k="periodLength" data-n="-1" aria-label="Shorter">−</button><span>' + s.periodLength + ' days</span><button data-act="step" data-k="periodLength" data-n="1" aria-label="Longer">+</button></span></div></div>';
+    h += '<div class="label">Birth control</div>';
+    h += '<button class="bc-row ' + (ui.bcOpen ? 'open' : '') + '" data-act="bcToggle" aria-expanded="' + (ui.bcOpen ? 'true' : 'false') + '"><span>' + cur[1] + '</span>' + icon('chevR') + '</button>';
+    if (ui.bcOpen) h += '<div style="margin-top:10px">' + BC.map(function (b) { return '<button class="radio ' + (s.birthControl === b[0] ? 'on' : '') + '" data-act="bc" data-v="' + b[0] + '"><i></i>' + b[1] + '</button>'; }).join('') + '</div>';
+    h += '<div class="note-card"><div class="small">What changes in the app</div><span class="chip">' + cur[2] + '</span><p>' + cur[3] + '</p></div>';
+    h += '<div class="label">Last period started</div>';
+    var ls = db.periodStarts.slice().sort().pop() || '';
+    h += '<input type="date" id="lastStart" max="' + todayIso() + '" value="' + ls + '"><button class="btn secondary" data-act="saveLastStart">Update date</button>';
+    h += '<div class="label">Your data</div><p class="sub">Everything is stored only on this device. Make a backup now and then, because clearing browser data would erase it.</p>' +
+      '<button class="btn secondary" data-act="importNotes">Import data</button>' +
+      '<button class="btn secondary" data-act="export">Download backup</button>' +
+      '<button class="btn danger" data-act="wipe">Delete all my data</button>';
+    h += '<div class="label">Sources</div><p class="sub">Personal perspectives, not medical advice. The tips in the app are my own summaries of:</p><ul class="know" style="margin-bottom:16px">' + SOURCES.map(function (r) { return '<li><a href="' + r[2] + '" target="_blank" rel="noopener">' + esc(r[1]) + '</a> (' + esc(r[0]) + ')</li>'; }).join('') + '</ul>';
+    h += '<button class="btn" data-act="go" data-v="today">Done</button>';
+    return h;
+  }
+
+  function daysIn(issueId, days) {
+    var set = {};
+    db.entries.forEach(function (e) { if (e.issueId === issueId) entryDays(e).forEach(function (d) { set[d] = 1; }); });
+    return days.filter(function (d) { return set[d]; }).length;
+  }
+  function monthDays(ym) {
+    var n = new Date(+ym.slice(0, 4), +ym.slice(5, 7), 0).getDate(), out = [];
+    for (var i = 1; i <= n; i++) out.push(ym + '-' + pad(i));
+    return out;
+  }
+  function shiftMonth(ym, n) {
+    var d = new Date(+ym.slice(0, 4), +ym.slice(5, 7) - 1 + n, 1);
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1);
+  }
+  function viewPatterns() {
+    var t = todayIso(), first = firstDataDate();
+    var h = '<div class="banner"><div><small>' + (first ? 'Your days at a glance' : 'Nothing yet') + '</small><h1>Patterns</h1></div></div>';
+    if (!first || !db.entries.length) {
+      return h + '<div class="card empty"><h2>No patterns yet</h2><p>Log a few days with the + button and your patterns will show up here.</p></div>' + navBar('patterns');
+    }
+    var cur = t.slice(0, 7), ym = ui.patMonth || cur;
+    if (ym > cur) ym = cur;
+    var firstYm = first.slice(0, 7);
+    if (ym < firstYm) ym = firstYm;
+    if (ui.patIssue && !issueById(ui.patIssue)) ui.patIssue = null;
+    var sel = ui.patIssue, selIssue = sel ? issueById(sel) : null;
+    var levels = dayLevels(sel), all = monthDays(ym);
+    var filterIssues = db.issues.filter(function (x) { return x.kind !== 'period'; });
+    h += '<div class="chip-row"><button class="opt sm ' + (!sel ? 'on' : '') + '" data-act="patIssue" data-id="">All</button>' +
+      filterIssues.map(function (x) { return '<button class="opt sm ' + (sel === x.id ? 'on' : '') + '" data-act="patIssue" data-id="' + esc(x.id) + '">' + esc(x.name) + '</button>'; }).join('') + '</div>';
+    h += '<button class="opt sm toggle ' + (ui.patCycle ? 'on' : '') + '" data-act="patCycle" aria-pressed="' + (ui.patCycle ? 'true' : 'false') + '">' + (ui.patCycle ? '✓ ' : '') + 'Show my cycle</button>';
+    var offset = (new Date(+ym.slice(0, 4), +ym.slice(5, 7) - 1, 1).getDay() + 6) % 7;
+    var cells = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(function (w) { return '<div class="dow">' + w + '</div>'; }).join('');
+    for (var b = 0; b < offset; b++) cells += '<div></div>';
+    all.forEach(function (d, idx) {
+      var cls = d > t ? 'future' : d < first ? 'before' : 'l' + (levels[d] || 0);
+      if (d === t) cls += ' today';
+      var phStyle = '', phName = '';
+      if (ui.patCycle && d <= t) {
+        var ci = cycleInfo(d);
+        if (ci) { cls += ' hasph'; phStyle = ' style="--ph:' + PHASES[ci.phase].hex + '"'; phName = ' · ' + PHASES[ci.phase].label; }
+      }
+      cells += '<div class="pcell ' + cls + '"' + phStyle + ' title="' + shortDate(d) + phName + '">' + (idx + 1) + '</div>';
+    });
+    h += '<section class="card"><div class="cal-head"><button data-act="patMonth" data-n="-1" ' + (ym <= firstYm ? 'disabled' : '') + ' aria-label="Previous month">' + icon('back') + '</button>' +
+      '<span>' + MONTHS[+ym.slice(5, 7) - 1] + ' ' + ym.slice(0, 4) + '</span>' +
+      '<button data-act="patMonth" data-n="1" ' + (ym >= cur ? 'disabled' : '') + ' aria-label="Next month">' + icon('chevR') + '</button></div>' +
+      '<div class="pgrid">' + cells + '</div>' +
+      '<div class="hlegend"><span><i class="l0"></i>Good</span><span><i class="l1"></i>Mild</span><span><i class="l2"></i>Medium</span><span><i class="l3"></i>Strong</span></div>' +
+      (ui.patCycle ? '<div class="legend" style="margin-top:12px">' + phaseLayout().map(function (p) { return '<span><i style="background:' + PHASES[p.key].hex + '"></i>' + PHASES[p.key].label + '</span>'; }).join('') + '</div>' : '') +
+      '</section>';
+
+    var days = all.filter(function (d) { return d <= t && d >= first; }), N = days.length;
+    var prevAll = monthDays(shiftMonth(ym, -1)), comparable = first <= prevAll[0];
+    var colors = ['#B04F1E', '#4B4BA0', '#3F7A63', '#8B3A5A', '#B8862F', '#1F4A78'];
+    var rows = N ? filterIssues.filter(function (x) { return !sel || x.id === sel; }).map(function (x, idx) {
+      return { x: x, n: daysIn(x.id, days), p: comparable ? daysIn(x.id, prevAll) : null, c: colors[idx % colors.length] };
+    }).filter(function (r) { return r.n > 0 || (r.p || 0) > 0; }) : [];
+    if (rows.length) {
+      h += '<section class="card"><h2>By issue</h2>' + rows.map(function (r) {
+        var cmp = r.p === null ? '' : r.n === r.p ? 'Same as last month' : r.n < r.p ? (r.p - r.n) + ' fewer than last month' : (r.n - r.p) + ' more than last month';
+        return '<div class="issue-row"><div class="top"><span>' + esc(r.x.name) + '</span><span>' + r.n + (r.n === 1 ? ' day' : ' days') + '</span></div><div class="bar"><i style="width:' + Math.max(2, Math.round(r.n / N * 100)) + '%;background:' + r.c + '"></i></div>' + (cmp ? '<small>' + cmp + '</small>' : '') + '</div>';
+      }).join('') + '</section>';
+    }
+    if (selIssue && db.periodStarts.length) {
+      var phDays = { period: 0, follicular: 0, ovulation: 0, luteal: 0 }, total = 0, seen = {};
+      db.entries.forEach(function (e) {
+        if (e.issueId !== sel) return;
+        entryDays(e).forEach(function (d) {
+          if (seen[d]) return; seen[d] = 1;
+          var ci = cycleInfo(d); if (!ci) return;
+          phDays[ci.phase]++; total++;
+        });
+      });
+      if (total) {
+        h += '<section class="card"><h2>When ' + esc(selIssue.name.toLowerCase()) + ' tends to happen</h2>' + phaseLayout().map(function (p) {
+          var n = phDays[p.key], pct = Math.round(n / total * 100);
+          return '<div class="issue-row"><div class="top"><span>' + PHASES[p.key].label + '</span><span>' + n + (n === 1 ? ' day' : ' days') + '</span></div><div class="bar"><i style="width:' + (n ? Math.max(2, pct) : 0) + '%;background:' + PHASES[p.key].hex + '"></i></div><small>' + pct + '% of your logged days</small></div>';
+        }).join('') + '<p class="sub" style="margin:12px 0 0;font-size:14px">Based on everything you have logged for this. More cycles make it more reliable.</p></section>';
+      }
+    }
+    var notes = db.entries.filter(function (e) { return (!sel || e.issueId === sel) && e.note && e.start.slice(0, 7) === ym; }).sort(function (a, b) { return a.start < b.start ? 1 : -1; });
+    if (notes.length) {
+      h += '<div class="section-h">Your notes</div>' + notes.map(function (e) {
+        var iss = issueById(e.issueId);
+        return '<div class="note-item"><small>' + shortDate(e.start) + ' · ' + esc(e.symptoms ? e.symptoms.join(', ') : e.noPoo ? 'Didn’t poo' : (e.where ? e.where + ' ' : '') + (iss ? (e.where ? iss.name.toLowerCase() : iss.name) : '')) + '</small>' + esc(e.note) + '</div>';
+      }).join('');
+    }
+    h += '<button class="btn secondary" data-act="history" data-from="patterns">See all entries</button>';
+    return h + navBar('patterns');
+  }
+
+  function describeEntry(e) {
+    var iss = issueById(e.issueId), bits = [];
+    if (e.symptoms && e.symptoms.length) bits.push(e.symptoms.join(', '));
+    if (e.where) bits.push(e.where);
+    if (e.noPoo) bits.push('Didn’t poo');
+    else if (e.bristol) bits.push('Type ' + e.bristol + ': ' + BRISTOL[e.bristol - 1][1]);
+    if (e.bloat) bits.push(['', 'Mild', 'Noticeable', 'Heavy'][e.bloat]);
+    if (typeof e.strength === 'number') bits.push(e.strength + '/10');
+    return { title: iss ? iss.name : 'Deleted issue', detail: bits.join(' · ') };
+  }
+  function viewHistory() {
+    var rows = [];
+    db.entries.forEach(function (e) { rows.push({ type: 'entry', date: e.start, e: e }); });
+    db.periodStarts.forEach(function (s) { rows.push({ type: 'period', date: s }); });
+    rows.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
+    var h = '<button class="back" data-act="go" data-v="' + ui.histFrom + '">' + icon('back') + ' Back</button><h1 class="screen-title">All entries</h1>' +
+      '<p class="sub">Newest first. Tap the bin to delete something you logged by mistake. You can undo straight after.</p>';
+    if (!rows.length) return h + '<div class="card empty"><p>Nothing logged yet.</p></div>';
+    return h + rows.map(function (r) {
+      var title, detail, when, note = '', key;
+      if (r.type === 'period') { title = 'Period started'; detail = ''; when = shortDate(r.date); key = 'data-act="delPeriod" data-d="' + r.date + '"'; }
+      else {
+        var d = describeEntry(r.e); title = d.title; detail = d.detail; note = r.e.note || '';
+        when = whenText({ start: r.e.start, end: r.e.end, ongoing: !r.e.end }); key = 'data-act="delEntry" data-id="' + r.e.id + '"';
+      }
+      return '<div class="hist"><div class="hist-main"><b>' + esc(title) + '</b><small>' + esc(when + (detail ? ' · ' + detail : '')) + '</small>' + (note ? '<em>' + esc(note) + '</em>' : '') + '</div>' +
+        '<button class="hist-del" ' + key + ' aria-label="Delete ' + esc(title) + ' from ' + esc(when) + '">' + icon('trash') + '</button></div>';
+    }).join('');
+  }
+
+  /* ---------- Eat: seasonal produce (grown in the Netherlands) ---------- */
+  var VEG_ALL = ['mushrooms'];
+  var SEASON = {
+    1: { veg: ['kale', 'Brussels sprouts', 'chicory', 'leek', 'red cabbage', 'white cabbage', 'savoy cabbage', 'carrot', 'parsnip', 'celeriac', 'beetroot', 'onion', 'salsify', "lamb's lettuce"], fruit: ['apple', 'pear'] },
+    2: { veg: ['kale', 'Brussels sprouts', 'chicory', 'leek', 'red cabbage', 'white cabbage', 'savoy cabbage', 'carrot', 'parsnip', 'celeriac', 'beetroot', 'onion', 'salsify', "lamb's lettuce"], fruit: ['apple', 'pear'] },
+    3: { veg: ['chicory', 'leek', 'red cabbage', 'white cabbage', 'carrot', 'parsnip', 'celeriac', 'beetroot', 'onion', "lamb's lettuce", 'spinach'], fruit: ['apple', 'pear'] },
+    4: { veg: ['spinach', 'radish', 'spring onion', 'lettuce', "lamb's lettuce", 'leek', 'carrot', 'white asparagus'], fruit: ['rhubarb', 'apple'] },
+    5: { veg: ['white asparagus', 'green asparagus', 'spinach', 'radish', 'lettuce', 'spring onion', 'new potatoes', 'sorrel'], fruit: ['strawberry', 'rhubarb'] },
+    6: { veg: ['green asparagus', 'peas', 'broad beans', 'courgette', 'cucumber', 'tomato', 'lettuce', 'radish', 'spinach', 'new potatoes', 'kohlrabi', 'cauliflower', 'broccoli', 'fennel', 'spring onion'], fruit: ['strawberry', 'cherry', 'raspberry', 'gooseberry', 'redcurrant', 'rhubarb'] },
+    7: { veg: ['courgette', 'cucumber', 'tomato', 'bell pepper', 'aubergine', 'green beans', 'peas', 'cauliflower', 'broccoli', 'fennel', 'beetroot', 'carrot', 'lettuce', 'kohlrabi', 'new potatoes'], fruit: ['strawberry', 'raspberry', 'blueberry', 'cherry', 'redcurrant', 'blackcurrant', 'gooseberry'] },
+    8: { veg: ['tomato', 'courgette', 'bell pepper', 'aubergine', 'cucumber', 'sweetcorn', 'green beans', 'broccoli', 'cauliflower', 'fennel', 'lettuce', 'beetroot', 'carrot', 'onion', 'leek', 'celery'], fruit: ['plum', 'blackberry', 'blueberry', 'raspberry', 'redcurrant', 'blackcurrant', 'elderberry', 'apple', 'pear'] },
+    9: { veg: ['pumpkin', 'sweetcorn', 'tomato', 'bell pepper', 'aubergine', 'courgette', 'broccoli', 'cauliflower', 'savoy cabbage', 'red cabbage', 'white cabbage', 'leek', 'celeriac', 'beetroot', 'carrot', 'onion', 'fennel', 'green beans', 'lettuce'], fruit: ['apple', 'pear', 'plum', 'grapes', 'blackberry', 'raspberry', 'blueberry', 'elderberry'] },
+    10: { veg: ['pumpkin', 'Brussels sprouts', 'red cabbage', 'white cabbage', 'savoy cabbage', 'leek', 'celeriac', 'beetroot', 'carrot', 'parsnip', 'chicory', 'fennel', 'cauliflower', 'broccoli', "lamb's lettuce", 'salsify'], fruit: ['apple', 'pear', 'quince', 'grapes', 'medlar'] },
+    11: { veg: ['kale', 'Brussels sprouts', 'pumpkin', 'red cabbage', 'white cabbage', 'savoy cabbage', 'leek', 'celeriac', 'parsnip', 'beetroot', 'carrot', 'chicory', 'salsify', "lamb's lettuce", 'onion', 'cauliflower'], fruit: ['apple', 'pear'] },
+    12: { veg: ['kale', 'Brussels sprouts', 'pumpkin', 'red cabbage', 'white cabbage', 'savoy cabbage', 'leek', 'celeriac', 'parsnip', 'beetroot', 'carrot', 'chicory', 'salsify', "lamb's lettuce", 'onion'], fruit: ['apple', 'pear'] }
+  };
+var IMPORT = {
+  1: ['clementine', 'orange', 'lemon', 'grapefruit', 'kiwi', 'pomegranate', 'persimmon'],
+  2: ['clementine', 'orange', 'lemon', 'grapefruit', 'kiwi', 'blood orange'],
+  3: ['orange', 'lemon', 'grapefruit', 'kiwi', 'blood orange'],
+  4: ['orange', 'lemon', 'kiwi', 'pineapple'],
+  5: ['cherry', 'apricot', 'kiwi', 'pineapple'],
+  6: ['cherry', 'apricot', 'peach', 'nectarine', 'watermelon', 'melon'],
+  7: ['peach', 'nectarine', 'apricot', 'watermelon', 'melon', 'cherry'],
+  8: ['peach', 'nectarine', 'watermelon', 'melon', 'fig', 'grapes'],
+  9: ['fig', 'grapes', 'peach', 'melon'],
+  10: ['fig', 'pomegranate', 'kiwi', 'persimmon', 'clementine'],
+  11: ['clementine', 'orange', 'lemon', 'kiwi', 'pomegranate', 'persimmon'],
+  12: ['clementine', 'orange', 'lemon', 'grapefruit', 'kiwi', 'pomegranate', 'persimmon']
+};
+  var MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  var EAT_PHASE = {
+    period: {
+      why: 'You lose iron with your flow. Pair iron-rich greens with something vitamin C-rich so you absorb more of it. Warm, cooked meals often feel best.',
+      foods: ['spinach', 'kale', 'beetroot', "lamb's lettuce", 'broccoli', 'Brussels sprouts', 'sorrel', 'peas', 'broad beans', 'strawberry', 'bell pepper', 'blackcurrant', 'redcurrant', 'cabbage', 'orange', 'kiwi', 'clementine', 'grapefruit', 'lemon']
+    },
+    follicular: {
+      why: 'Energy is building. Fresh, light, crunchy food works well, with some protein to go with it.',
+      foods: ['white asparagus', 'green asparagus', 'radish', 'spinach', 'lettuce', 'spring onion', 'peas', 'broccoli', 'cauliflower', 'cucumber', 'kohlrabi', 'rhubarb', 'strawberry', 'fennel', 'sorrel']
+    },
+    ovulation: {
+      why: 'Fibre, colour and plenty of water. Berries, tomatoes and veg with lots of antioxidants are a good fit.',
+      foods: ['tomato', 'courgette', 'bell pepper', 'fennel', 'cucumber', 'raspberry', 'blueberry', 'strawberry', 'blackberry', 'cherry', 'broccoli', 'cauliflower', 'green beans', 'lettuce', 'radish']
+    },
+    luteal: {
+      why: 'Your body burns a bit more energy now, so regular meals with some slow carbs, fibre and magnesium help keep mood and cravings steadier. Try not to skip meals.',
+      foods: ['pumpkin', 'sweetcorn', 'spinach', 'kale', 'parsnip', 'carrot', 'beetroot', 'leek', 'celeriac', 'savoy cabbage', 'red cabbage', 'white cabbage', 'cauliflower', 'broccoli', 'apple', 'pear', 'plum', 'new potatoes']
+    }
+  };
+  var GUT_FOODS = ['carrot', 'pumpkin', 'courgette', 'parsnip', 'cucumber', 'blueberry', 'strawberry', 'spinach', 'new potatoes', 'sweetcorn'];
+  var EAT_WHY = {
+    period: {
+      spinach: 'Iron, folate', kale: 'Iron, vitamin C', beetroot: 'Iron, folate', "lamb's lettuce": 'Iron, vitamin C', broccoli: 'Iron, vitamin C',
+      'Brussels sprouts': 'Vitamin C, iron', sorrel: 'Iron', peas: 'Plant iron, protein', 'broad beans': 'Plant iron, protein', strawberry: 'Vitamin C',
+      'bell pepper': 'Vitamin C', blackcurrant: 'Vitamin C', redcurrant: 'Vitamin C', cabbage: 'Vitamin C, fibre',
+      orange: 'Vitamin C', kiwi: 'Vitamin C', clementine: 'Vitamin C', grapefruit: 'Vitamin C', lemon: 'Vitamin C'
+    },
+    follicular: {
+      'white asparagus': 'Light, folate', 'green asparagus': 'Light, folate', radish: 'Fresh, vitamin C', spinach: 'Folate, iron',
+      lettuce: 'Light, hydrating', 'spring onion': 'Light, fresh', peas: 'Protein, fibre', broccoli: 'Fibre, folate',
+      cauliflower: 'Fibre, vitamin C', cucumber: 'Hydrating', kohlrabi: 'Vitamin C', rhubarb: 'Fibre',
+      strawberry: 'Vitamin C', fennel: 'Gentle digestion', sorrel: 'Fresh greens'
+    },
+    ovulation: {
+      tomato: 'Lycopene', courgette: 'Light, fibre', 'bell pepper': 'Antioxidants, vitamin C', fennel: 'Fibre',
+      cucumber: 'Hydrating', raspberry: 'Fibre, antioxidants', blueberry: 'Fibre, antioxidants', strawberry: 'Antioxidants, vitamin C', blackberry: 'Fibre, antioxidants',
+      cherry: 'Antioxidants', broccoli: 'Fibre, vitamin C', cauliflower: 'Fibre', 'green beans': 'Fibre', lettuce: 'Water-rich', radish: 'Water-rich'
+    },
+    luteal: {
+      pumpkin: 'Slow carbs, magnesium', sweetcorn: 'Slow carbs', spinach: 'Magnesium, iron', kale: 'Magnesium, calcium',
+      parsnip: 'Slow carbs, fibre', carrot: 'Fibre', beetroot: 'Fibre, iron', leek: 'Gentle fibre', celeriac: 'Fibre',
+      cabbage: 'Fibre', cauliflower: 'Fibre, B vitamins', broccoli: 'Fibre, B vitamins', apple: 'Fibre', pear: 'Fibre',
+      plum: 'Fibre', 'new potatoes': 'Slow carbs'
+    }
+  };
+  
+function whyFor(phase, n) {
+    var w = EAT_WHY[phase] || {};
+    if (w[n]) return w[n];
+    for (var k in w) { if (k.length > 4 && n.indexOf(k) !== -1) return w[k]; }
+    return '';
+  }
+  function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+  function pills(list, cls, hi) {
+    return '<div class="chips">' + list.map(function (n) {
+      return '<span class="chip pr ' + cls + (hi && hi.indexOf(n) !== -1 ? ' hi' : '') + '">' + esc(cap(n)) + '</span>';
+    }).join('') + '</div>';
+  }
+  function recentGut() {
+    var from = addDays(todayIso(), -14);
+    return db.entries.some(function (e) {
+      var i = issueById(e.issueId);
+      return i && (i.kind === 'gut' || i.kind === 'bloat' || i.kind === 'poop') && (e.end || todayIso()) >= from;
+    });
+  }
+  function viewEat() {
+    var nowM = new Date().getMonth() + 1, m = nowM, S = SEASON[m];
+    var info = cycleInfo(todayIso());
+    var h = '<div class="banner"><div><small>Grown in the Netherlands</small><h1>Eat</h1></div></div>';
+    var all = S.veg.concat(S.fruit, VEG_ALL, IMPORT[m]);
+    var fp = null;
+    if (info) {
+      fp = EAT_PHASE[info.phase];
+      var match = all.filter(function (n) { return fp.foods.indexOf(n) !== -1 || fp.foods.some(function (f) { return n.indexOf(f) !== -1 && f.length > 4; }); });
+      h += '<section class="card"><h2>For your ' + PHASES[info.phase].label.toLowerCase() + ' phase</h2><p>' + esc(fp.why) + '</p>';
+      h += match.length ? '<p class="muted" style="margin:10px 0 8px">In season in ' + MONTH_NAMES[m - 1] + ' and a good fit:</p>' + '<div class="why-list">' + (ui.eatMore ? match : match.slice(0, 6)).map(function (n) { return '<div class="why-row"><b>' + esc(cap(n)) + '</b><span>' + esc(whyFor(info.phase, n)) + '</span></div>'; }).join('') + '</div>' + (match.length > 6 ? '<button class="more" data-act="eatMore">' + (ui.eatMore ? 'Show less' : 'Show ' + (match.length - 6) + ' more') + '</button>' : '') : '<p class="muted" style="margin-top:8px">Nothing on the list below is a standout for this phase this month, so just eat what you enjoy.</p>';
+      h += '</section>';
+    }
+    if (recentGut()) {
+      var gm = all.filter(function (n) { return GUT_FOODS.indexOf(n) !== -1; });
+      if (gm.length) h += '<section class="card"><h2>If your tummy is touchy</h2><p>You logged gut or poo notes recently. Cooked veg is usually gentler than raw, and these are in season and mild:</p><div style="height:8px"></div>' + pills(gm, 'mild') + '</section>';
+    }
+    h += '<section class="card"><h2>Vegetables in ' + MONTH_NAMES[m - 1] + '</h2>' + pills(S.veg.concat(VEG_ALL), 'veg', fp ? fp.foods : null) + '</section>';
+    h += '<section class="card"><h2>Fruit in ' + MONTH_NAMES[m - 1] + '</h2>' + pills(S.fruit, 'fruit', fp ? fp.foods : null) + '</section>';
+    h += '<section class="card"><h2>Imported fruit in ' + MONTH_NAMES[m - 1] + '</h2><p class="muted" style="margin-bottom:8px">Not grown here, but in season in southern Europe and elsewhere.</p>' + pills(IMPORT[m], 'import', fp ? fp.foods : null) + '</section>';
+    h += '<p class="quiet" style="margin-top:8px">A general guide to Dutch-grown seasonal produce. Dates vary a little by year and by greenhouse. Not medical or dietary advice.</p>';
+    return h + navBar('today');
+  }
+
+function viewLearn() {
+  var info = cycleInfo(todayIso());
+  var key = info ? info.phase : 'luteal', T = PHASE_TEXT[key], ph = PHASES[key];
+  var h = '<div class="banner"><div><small>' + (ui.learnKind === 'going' ? 'More on what’s going on' : 'More on what to do') + '</small><h1>' + ph.label + ' phase</h1></div></div>';
+  if (T.know) {
+    T.know.filter(function (g) { return (g[0] === 'Body') === (ui.learnKind === 'going'); }).forEach(function (g) {
+      h += '<section class="card">' + (g[0] === 'Body' ? '' : '<span class="tag ' + g[0] + ' grp">' + g[0] + '</span>') + '<ul class="know">' + g[1].map(function (k) { return '<li>' + esc(k) + '</li>'; }).join('') + '</ul></section>';
+    });
+  }
+  return h + '<button class="btn" data-act="go" data-v="today">Back to Today</button>' + navBar('today');
+}
+
+  /* ---------- Import from notes ---------- */
+  var MON = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+  function mkIso(y, m, d) {
+    if (y < 100) y += 2000;
+    var dt = new Date(y, m, d);
+    if (dt.getFullYear() !== y || dt.getMonth() !== m || dt.getDate() !== d) return null;
+    return iso(dt);
+  }
+  function looseDate(s) {
+    s = String(s || '').trim().replace(/^"|"$/g, '');
+    var m;
+    if ((m = s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/))) return mkIso(+m[1], +m[2] - 1, +m[3]);
+    if ((m = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4}|\d{2})$/))) return mkIso(+m[3], +m[2] - 1, +m[1]);
+    if ((m = s.match(/^(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3,9})\.?,?\s+(\d{4})$/)) && MON[m[2].slice(0, 3).toLowerCase()] !== undefined) return mkIso(+m[3], MON[m[2].slice(0, 3).toLowerCase()], +m[1]);
+    if ((m = s.match(/^([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})$/)) && MON[m[1].slice(0, 3).toLowerCase()] !== undefined) return mkIso(+m[3], MON[m[1].slice(0, 3).toLowerCase()], +m[2]);
+    return null;
+  }
+  function parseNotes(text) {
+    var out = { rows: [], errors: [], skipped: 0, newIssues: [], noRating: 0 };
+    var today = todayIso(), seen = {}, newSeen = {};
+    String(text || '').split(/\r?\n/).forEach(function (raw, idx) {
+      var line = raw.trim();
+      if (!line) return;
+      var delim = line.indexOf('\t') > -1 ? '\t' : line.indexOf(';') > -1 ? ';' : ',';
+      var p = line.split(delim).map(function (x) { return x.trim().replace(/^"(.*)"$/, '$1'); });
+      if (/^date$/i.test(p[0])) return;
+      var L = 'Line ' + (idx + 1) + ': ';
+      var date = looseDate(p[0]);
+      if (!date) { out.errors.push(L + 'could not read the date "' + p[0] + '". Use a full date like 2025-10-12 or 12/10/2025.'); return; }
+      if (date > today) { out.errors.push(L + 'that date is in the future.'); return; }
+      var what = (p[1] || '').trim();
+      if (!what) { out.errors.push(L + 'add what it was after the date.'); return; }
+      var rating = (p[2] || '').trim(), note = p.slice(3).join(delim).trim();
+      var low = what.toLowerCase(), kind, issue = null, name = null;
+      if (/^(period|periods|menstruation|menses)( start(ed)?)?$/.test(low)) kind = 'period';
+      else if (/^(poo|poop|pooping|bowel movement|bm|stool|bristol)/.test(low)) { kind = 'poop'; issue = issueById('poop'); }
+      else {
+        issue = db.issues.filter(function (i) { return i.kind !== 'period' && i.kind !== 'poop' && i.name.toLowerCase() === low; })[0] ||
+          db.issues.filter(function (i) { var n = i.name.toLowerCase(); return i.kind !== 'period' && i.kind !== 'poop' && (n.indexOf(low) !== -1 || low.indexOf(n) !== -1); })[0];
+        if (issue) kind = issue.kind; else { kind = 'custom'; name = what.charAt(0).toUpperCase() + what.slice(1); }
+      }
+      var row = { date: date, kind: kind, issueId: issue ? issue.id : null, name: name, note: note, label: issue ? issue.name : name || 'Period started' };
+      var key;
+      if (kind === 'period') {
+        key = 'period|' + date;
+        if (seen[key] || db.periodStarts.indexOf(date) !== -1) { out.skipped++; return; }
+        row.label = 'Period started';
+      } else if (kind === 'poop') {
+        key = 'poop|' + date;
+        if (/^(none|no|nothing|didn.?t.*|0)$/i.test(rating)) { row.noPoo = true; row.detail = 'Didn’t poo'; }
+        else {
+          var b = parseInt(rating, 10);
+          if (!(b >= 1 && b <= 7)) { out.errors.push(L + 'for poo, write the type 1 to 7 (Bristol) or "none".'); return; }
+          row.bristol = b; row.detail = 'Type ' + b;
+        }
+        row.label = 'Poo tracker';
+        if (seen[key] || db.entries.some(function (e) { return e.issueId === 'poop' && e.start === date; })) { out.skipped++; return; }
+      } else {
+        key = (issue ? issue.id : 'new:' + low) + '|' + date;
+        if (rating === '') { row.strength = 5; out.noRating++; row.detail = 'no rating (set to 5)'; }
+        else {
+          var n = parseFloat(rating.replace(',', '.'));
+          if (isNaN(n) || n < 0 || n > 10) { out.errors.push(L + 'the rating must be a number from 0 to 10.'); return; }
+          row.strength = Math.round(n); row.detail = row.strength + '/10';
+        }
+        if (seen[key] || (issue && db.entries.some(function (e) { return e.issueId === issue.id && e.start === date; }))) { out.skipped++; return; }
+        if (!issue && !newSeen[low]) { newSeen[low] = 1; out.newIssues.push(name); }
+      }
+      seen[key] = 1;
+      out.rows.push(row);
+    });
+    return out;
+  }
+  function commitNotes(rows) {
+    var addedE = [], addedI = [], addedP = [], created = {};
+    rows.forEach(function (r) {
+      if (r.kind === 'period') { db.periodStarts.push(r.date); addedP.push(r.date); return; }
+      var issueId = r.issueId;
+      if (!issueId) {
+        var k = r.name.toLowerCase();
+        if (!created[k]) { var t = ISSUE_TILES[0], ni = { id: uid(), name: r.name, kind: 'custom', icon: t[0], tile: t[1] }; db.issues.push(ni); addedI.push(ni.id); created[k] = ni.id; }
+        issueId = created[k];
+      }
+      var issue = issueById(issueId);
+      var draft = { strength: r.strength, bristol: r.bristol, noPoo: r.noPoo, bloat: r.strength <= 3 ? 1 : r.strength <= 6 ? 2 : 3 };
+      var e = { id: uid(), issueId: issueId, start: r.date, end: r.date, level: levelFor(issue, draft), note: r.note || '' };
+      if (issue.kind === 'poop') { if (r.noPoo) e.noPoo = true; else e.bristol = r.bristol; }
+      else if (issue.kind === 'bloat') e.bloat = draft.bloat;
+      else { e.strength = r.strength; e.scale = 10; }
+      db.entries.push(e); addedE.push(e.id);
+    });
+    db.periodStarts.sort(); save();
+    return function () {
+      db.entries = db.entries.filter(function (x) { return addedE.indexOf(x.id) === -1; });
+      db.issues = db.issues.filter(function (x) { return addedI.indexOf(x.id) === -1; });
+      db.periodStarts = db.periodStarts.filter(function (x) { return addedP.indexOf(x) === -1; });
+      save(); render();
+    };
+  }
+  var AI_PROMPT = [
+    'Convert my personal health notes into plain text lines for an import tool. Output only the lines in a code block, nothing else. One entry per line, in this exact format:',
+    'date, what, rating, note',
+    'Rules:',
+    '- date: always a full date with the year, like 2025-10-12.',
+    '- what: use "period" for the first day of a period, "poo" for a bowel movement, otherwise a short issue name such as "back pain", "cystitis", "gut issues" or "migraine". Use the same name every time for the same issue.',
+    '- rating: for "period" leave it empty. For "poo" use the Bristol stool type from 1 to 7, or "none" if I did not poo. For anything else use a pain or strength number from 0 to 10 (0 = none, 10 = worst ever). If my notes give no number, estimate it from my words and tell me which lines you guessed.',
+    '- note: optional short free text. It may contain commas.',
+    '- One line per day per issue. If a day has no year in my notes, ask me which year it is.',
+    'Example:',
+    '2025-10-12, period',
+    '2025-10-12, back pain, 6, after gym',
+    '2025-10-13, poo, 4',
+    '2025-10-14, poo, none',
+    'My notes:'
+  ].join('\n');
+  function viewImportNotes() {
+    var r = ui.imp;
+    var h = '<button class="back" data-act="go" data-v="settings">' + icon('back') + ' Back</button><h1 class="screen-title">Import data</h1>' +
+      '<button class="btn secondary" data-act="copyPrompt">Copy a prompt for an AI</button>' +
+      '<label class="btn secondary" style="display:block;text-align:center;cursor:pointer">Choose a file<input type="file" id="notesFile" accept=".txt,.csv,.tsv,text/plain,text/csv" style="display:none"></label>' +
+      '<button class="btn secondary" data-act="import">Restore from backup</button>';
+    if (r) {
+      h += '<div class="card" style="margin-top:14px"><h2>' + (r.rows.length ? r.rows.length + ' ' + (r.rows.length === 1 ? 'entry' : 'entries') + ' ready to import' : 'Nothing to import yet') + '</h2>';
+      if (r.rows.length) {
+        h += '<div class="hist">' + r.rows.slice(0, 8).map(function (x) { return '<div class="note-item"><small>' + shortDate(x.date) + '</small>' + esc(x.label) + (x.detail ? ' · ' + esc(x.detail) : '') + '</div>'; }).join('') + '</div>';
+        if (r.rows.length > 8) h += '<p class="muted">and ' + (r.rows.length - 8) + ' more</p>';
+      }
+      if (r.newIssues.length) h += '<p class="muted" style="margin-top:8px">New issues will be added: ' + esc(r.newIssues.join(', ')) + '</p>';
+      if (r.skipped) h += '<p class="muted" style="margin-top:8px">' + r.skipped + ' skipped because you already have them.</p>';
+      if (r.errors.length) h += '<p style="margin-top:10px;color:#B3362A;font-weight:700">' + r.errors.length + ' ' + (r.errors.length === 1 ? 'line' : 'lines') + ' could not be read:</p><ul class="know">' + r.errors.slice(0, 8).map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' + (r.errors.length > 8 ? '<p class="muted">and ' + (r.errors.length - 8) + ' more</p>' : '');
+      h += '</div>';
+      if (r.rows.length) h += '<button class="btn" data-act="impGo">Import ' + r.rows.length + ' ' + (r.rows.length === 1 ? 'entry' : 'entries') + '</button>';
+    }
+    return h;
+  }
+
+  function render() {
+    var v = ui.view, html;
+    if (v === 'today') html = viewToday();
+    else if (v === 'patterns') html = viewPatterns();
+    else if (v === 'eat') html = viewEat();
+    else if (v === 'learn') html = viewLearn();
+    else if (v === 'importNotes') html = viewImportNotes();
+    else if (v === 'log') html = viewLog();
+    else if (v === 'issue') html = viewIssue();
+    else if (v === 'addIssue') html = viewAddIssue();
+    else if (v === 'history') html = viewHistory();
+    else html = viewSettings();
+    app.className = (v === 'today' || v === 'patterns' || v === 'eat' || v === 'learn') ? '' : 'noNav';
+    app.innerHTML = html;
+  }
+
+  /* ---------- Actions ---------- */
+  function addPeriodStart(dateIso, withUndo) {
+    if (db.periodStarts.indexOf(dateIso) !== -1) { toast('A period start is already logged for that day.'); return false; }
+    db.periodStarts.push(dateIso); db.periodStarts.sort(); save();
+    toast('Period start logged for ' + shortDate(dateIso), withUndo ? function () {
+      db.periodStarts = db.periodStarts.filter(function (s) { return s !== dateIso; }); save(); render();
+    } : null);
+    return true;
+  }
+  function newDraft(issue) {
+    var t = todayIso();
+    return { issueId: issue.id, where: null, strength: 5, bloat: 2, bristol: 4, noPoo: false, symptoms: [], start: t, end: t, ongoing: false, note: '', calMonth: t.slice(0, 7) };
+  }
+
+  var actions = {
+    copyPrompt: function () {
+      var done = function () { toast('Prompt copied. Paste it into an AI, then add your notes.'); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(AI_PROMPT).then(done, function () { window.prompt('Copy this prompt:', AI_PROMPT); });
+      else window.prompt('Copy this prompt:', AI_PROMPT);
+    },
+    importNotes: function () { ui.imp = null; ui.impText = ""; go("importNotes"); },
+    eatMore: function () { ui.eatMore = !ui.eatMore; render(); },
+impGo: function () {
+  var r = ui.imp; if (!r || !r.rows.length) return;
+  var undo = commitNotes(r.rows), n = r.rows.length;
+  ui.imp = null; ui.impText = ""; go("today"); toast(n + (n === 1 ? " entry" : " entries") + " imported", undo);
+},
+    learn: function (el) { go('learn', { learnKind: el.getAttribute('data-k') }); },
+    go: function (el) { go(el.getAttribute('data-v')); },
+    firstStart: function () {
+      var v = document.getElementById('firstStart').value;
+      if (!v || v > todayIso()) { toast('Pick a date that is today or earlier.'); return; }
+      db.periodStarts.push(v); save(); render();
+    },
+    pick: function (el) {
+      var issue = issueById(el.getAttribute('data-id'));
+      if (issue.kind === 'period') {
+        if (addPeriodStart(todayIso(), true)) go('today');
+      } else if (issue.kind === 'tap') {
+        var e = { id: uid(), issueId: issue.id, start: todayIso(), end: todayIso(), level: 2, note: '' };
+        db.entries.push(e); save(); go('today');
+        toast(issue.name + ' logged for today', function () { db.entries = db.entries.filter(function (x) { return x.id !== e.id; }); save(); render(); });
+      } else {
+        go('issue', { draft: newDraft(issue) });
+      }
+    },
+    where: function (el) { var w = el.getAttribute('data-w'); ui.draft.where = ui.draft.where === w ? null : w; render(); },
+    strength: function (el) { ui.draft.strength = +el.getAttribute('data-n'); render(); },
+    bloat: function (el) { ui.draft.bloat = +el.getAttribute('data-n'); render(); },
+    bristol: function (el) { ui.draft.bristol = +el.getAttribute('data-n'); render(); },
+    month: function (el) {
+      var p = ui.draft.calMonth.split('-'), d = new Date(+p[0], +p[1] - 1 + (+el.getAttribute('data-n')), 1);
+      ui.draft.calMonth = d.getFullYear() + '-' + pad(d.getMonth() + 1); render();
+    },
+    day: function (el) {
+      var d = ui.draft, ds = el.getAttribute('data-d');
+      if (d.start && d.end === d.start && !d.ongoing && ds > d.start && d.pickingEnd) { d.end = ds; d.pickingEnd = false; }
+      else if (d.ongoing && ds > d.start) { d.end = ds; d.ongoing = false; d.pickingEnd = false; }
+      else { d.start = ds; d.end = ds; d.ongoing = false; d.pickingEnd = true; }
+      render();
+    },
+    ongoing: function () { var d = ui.draft; d.ongoing = !d.ongoing; if (d.ongoing) { d.end = null; } else { d.end = d.start; } d.pickingEnd = false; render(); },
+    saveEntry: function () {
+      var d = ui.draft, issue = issueById(d.issueId);
+      var e = { id: uid(), issueId: issue.id, start: d.start, end: d.ongoing ? null : (d.end || d.start), level: levelFor(issue, d), note: (d.note || '').trim() };
+      if (d.where) e.where = d.where;
+      if (issue.kind === 'gut' && !d.symptoms.length) { toast('Pick at least one symptom.'); return; }
+      if (issue.kind === 'pain' || issue.kind === 'custom' || issue.kind === 'gut') { e.strength = d.strength; e.scale = 10; }
+      if (issue.kind === 'gut') e.symptoms = d.symptoms.slice();
+      if (issue.kind === 'bloat') e.bloat = d.bloat;
+      if (issue.kind === 'poop') { if (d.noPoo) e.noPoo = true; else e.bristol = d.bristol; }
+      db.entries.push(e); save(); go('today');
+      toast(issue.name + ' saved', function () { db.entries = db.entries.filter(function (x) { return x.id !== e.id; }); save(); render(); });
+    },
+    history: function (el) { go('history', { histFrom: el.getAttribute('data-from') || 'patterns' }); },
+    delEntry: function (el) {
+      var id = el.getAttribute('data-id'), e = db.entries.filter(function (x) { return x.id === id; })[0];
+      if (!e) return;
+      db.entries = db.entries.filter(function (x) { return x.id !== id; }); save(); render();
+      toast('Entry deleted', function () { db.entries.push(e); save(); render(); });
+    },
+    delPeriod: function (el) {
+      var d = el.getAttribute('data-d');
+      db.periodStarts = db.periodStarts.filter(function (s) { return s !== d; }); save(); render();
+      toast('Period start deleted', function () { db.periodStarts.push(d); db.periodStarts.sort(); save(); render(); });
+    },
+    addPreset: function (el) {
+      var p = PRESETS.filter(function (x) { return x.id === el.getAttribute('data-id'); })[0];
+      if (!p || issueById(p.id)) return;
+      db.issues.push(JSON.parse(JSON.stringify(p))); save(); go('log'); toast(p.name + ' added');
+    },
+    noPoo: function () { ui.draft.noPoo = !ui.draft.noPoo; render(); },
+    symptom: function (el) {
+      var s = el.getAttribute('data-s'), a = ui.draft.symptoms, i = a.indexOf(s);
+      if (i === -1) a.push(s); else a.splice(i, 1); render();
+    },
+    addIssue: function () { go('addIssue', { draft: { name: '', tileIdx: 0 } }); },
+    tile: function (el) { ui.draft.tileIdx = +el.getAttribute('data-n'); render(); var n = document.querySelector('[data-input=name]'); },
+    saveIssue: function () {
+      var name = (ui.draft.name || '').trim();
+      if (!name) { toast('Give it a name first.'); return; }
+      var t = ISSUE_TILES[ui.draft.tileIdx];
+      db.issues.push({ id: uid(), name: name, kind: 'custom', icon: t[0], tile: t[1] }); save(); go('log');
+    },
+    patIssue: function (el) { ui.patIssue = el.getAttribute('data-id') || null; render(); },
+    patCycle: function () { ui.patCycle = !ui.patCycle; render(); },
+    patMonth: function (el) { ui.patMonth = shiftMonth(ui.patMonth || todayIso().slice(0, 7), +el.getAttribute('data-n')); render(); },
+    step: function (el) {
+      var k = el.getAttribute('data-k'), n = +el.getAttribute('data-n'), lim = k === 'cycleLength' ? [21, 45] : [2, 10];
+      db.settings[k] = Math.min(lim[1], Math.max(lim[0], db.settings[k] + n)); save(); render();
+    },
+    bc: function (el) { db.settings.birthControl = el.getAttribute('data-v'); ui.bcOpen = false; save(); render(); },
+    bcToggle: function () { ui.bcOpen = !ui.bcOpen; render(); },
+    saveLastStart: function () {
+      var v = document.getElementById('lastStart').value;
+      if (!v || v > todayIso()) { toast('Pick a date that is today or earlier.'); return; }
+      var latest = db.periodStarts.slice().sort().pop();
+      if (v === latest) { toast('That is already your last period start.'); return; }
+      // Replace the most recent start with the new date (this is a correction, not a new period).
+      db.periodStarts = db.periodStarts.filter(function (s) { return s !== latest && s !== v; });
+      db.periodStarts.push(v); db.periodStarts.sort(); save();
+      toast('Last period start set to ' + shortDate(v)); render();
+    },
+    export: function () {
+      var blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
+      var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'body-tracker-backup-' + todayIso() + '.json';
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+    },
+    import: function () { document.getElementById('importFile').click(); },
+    wipe: function () {
+      if (window.confirm('Delete all your data from this device? This cannot be undone.')) { db = defaultDb(); save(); go('today'); toast('All data deleted'); }
+    },
+    undo: function () { if (toastUndo) { toastUndo(); toastUndo = null; } document.getElementById('toast').className = ''; }
+  };
+
+  document.addEventListener('click', function (ev) {
+    var el = ev.target.closest('[data-act]');
+    if (el && actions[el.getAttribute('data-act')]) actions[el.getAttribute('data-act')](el);
+  });
+  document.addEventListener('input', function (ev) {
+    if (ev.target.getAttribute && ev.target.getAttribute('data-range') === 'strength' && ui.draft) {
+      // Update in place (no re-render) so dragging the slider stays smooth.
+      var v = +ev.target.value;
+      ui.draft.strength = v;
+      var bub = document.getElementById('bubble'), lab = document.getElementById('strengthLabel');
+      if (bub) { bub.textContent = v; bub.style.setProperty('--v', v); }
+      if (lab) lab.textContent = v === 0 ? 'None' : v <= 3 ? 'Mild' : v <= 6 ? 'Medium' : 'Strong';
+      return;
+    }
+    var k = ev.target.getAttribute && ev.target.getAttribute('data-input');
+    if (k && ui.draft) ui.draft[k] = ev.target.value;
+  });
+  document.addEventListener('change', function (ev) {
+    if (!ev.target || ev.target.id !== 'notesFile') return;
+    var f = ev.target.files && ev.target.files[0]; if (!f) return;
+    var rd = new FileReader();
+    rd.onload = function () { ui.impText = String(rd.result || ''); ui.imp = parseNotes(ui.impText); render(); };
+    rd.readAsText(f);
+  });
+  document.getElementById('importFile').addEventListener('change', function (ev) {
+    var f = ev.target.files[0]; if (!f) return;
+    var r = new FileReader();
+    r.onload = function () {
+      try {
+        var s = JSON.parse(r.result);
+        if (!(s && s.settings && s.issues && s.entries && s.periodStarts)) throw new Error('bad');
+        if (window.confirm('Replace the data on this device with this backup?')) { db = s; save(); go('today'); toast('Backup restored'); }
+      } catch (e) { toast('That file is not a Body tracker backup.'); }
+      ev.target.value = '';
+    };
+    r.readAsText(f);
+  });
+
+  render();
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    navigator.serviceWorker.register('sw.js').catch(function () { /* offline support is optional */ });
+  }
+  /* Ask the browser to keep this data permanently (it may decline; that is fine). */
+  try {
+    if (navigator.storage && navigator.storage.persist) {
+      navigator.storage.persist().catch(function () {});
+    }
+  } catch (e) { /* optional */ }
+})();
