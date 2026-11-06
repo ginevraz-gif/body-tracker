@@ -25,13 +25,17 @@
     return [
       { id: 'period', name: 'My period started today', sub: 'Tap once to mark today as day 1', kind: 'period', icon: 'drop', tile: 'tile-pink', pinned: true },
       { id: 'poop', name: 'Poo tracker', sub: 'Bristol scale, or note that you didn’t poo', kind: 'poop', icon: 'poop', tile: 'tile-orange', pinned: true },
-      { id: 'back', name: 'Back pain', kind: 'pain', icon: 'pulse', tile: 'tile-yellow', where: ['Lower back', 'Mid back', 'Upper back', 'Left side', 'Right side', 'Hips'] }
+      { id: 'back', name: 'Back pain', kind: 'pain', icon: 'spine', tile: 'tile-yellow', where: ['Lower back', 'Mid back', 'Upper back', 'Left side', 'Right side', 'Hips'] }
     ];
   }
   /* Ready-made issues offered under "Add an issue". */
   var PRESETS = [
-    { id: 'gut', name: 'Gut issues', sub: 'Bloating, stomach burning, nausea', kind: 'gut', icon: 'bloat', tile: 'tile-lilac', symptoms: ['Bloating', 'Stomach burning', 'Nausea'] },
-    { id: 'cystitis', name: 'Cystitis', sub: 'Rate how bad it is, 0 to 10', kind: 'pain', icon: 'cyst', tile: 'tile-blue' }
+    { id: 'headache', name: 'Headache', kind: 'pain', icon: 'headache', tile: 'tile-yellow', where: ['Forehead', 'Temples', 'Back of head', 'One side', 'Behind the eyes'] },
+    { id: 'neck', name: 'Neck pain', kind: 'pain', icon: 'neck', tile: 'tile-yellow', where: ['Back of neck', 'Left side', 'Right side', 'Shoulders'] },
+    { id: 'cramps', name: 'Period cramps', kind: 'pain', icon: 'uterus', tile: 'tile-pink', where: ['Lower belly', 'Left side', 'Right side', 'Lower back'] },
+    { id: 'breast', name: 'Breast tenderness', kind: 'pain', icon: 'breast', tile: 'tile-pink', where: ['Left', 'Right', 'Both'] },
+    { id: 'gut', name: 'Gut pain', sub: 'Bloating, stomach burning, nausea', kind: 'gut', icon: 'gut', tile: 'tile-lilac', symptoms: ['Bloating', 'Stomach burning', 'Nausea'] },
+    { id: 'cystitis', name: 'Cystitis', kind: 'pain', icon: 'bladder', tile: 'tile-blue' }
   ];
   function defaultDb() {
     return { settings: { cycleLength: 28, periodLength: 5, birthControl: 'none' }, periodStarts: [], issues: defaultIssues(), entries: [] };
@@ -43,7 +47,7 @@
         // Keep names and subtitles of built-in issues current.
         var canon = defaultIssues().concat(PRESETS);
         s.issues.forEach(function (i) {
-          canon.forEach(function (c) { if (c.id === i.id) { i.name = c.name; i.sub = c.sub; i.kind = c.kind; i.pinned = !!c.pinned; } });
+          canon.forEach(function (c) { if (c.id === i.id) { i.name = c.name; i.sub = c.sub; i.kind = c.kind; i.pinned = !!c.pinned; if (c.icon) { i.icon = c.icon; i.tile = c.tile; } } });
         });
         // Older entries used a 1-5 strength; convert to the 0-10 scale.
         s.entries.forEach(function (e) { if (typeof e.strength === 'number' && e.scale !== 10) { e.strength = e.strength * 2; e.scale = 10; } });
@@ -51,7 +55,9 @@
         defaultIssues().filter(function (c) { return c.pinned; }).reverse().forEach(function (c) {
           if (!s.issues.some(function (i) { return i.id === c.id; })) s.issues.unshift(c);
         });
-        var rank = function (i) { var p = ['period', 'poop'].indexOf(i.id); return i.pinned ? (p === -1 ? 2 : p) : 3; };
+        // Pre-create the library so every common pain is always in the log list.
+        PRESETS.forEach(function (c) { if (!s.issues.some(function (i) { return i.id === c.id; })) s.issues.push(JSON.parse(JSON.stringify(c))); });
+        var rank = function (i) { var p = ['period', 'poop'].indexOf(i.id); if (i.pinned) return p === -1 ? 2 : p; var o = ['back', 'headache', 'neck', 'cramps', 'breast', 'gut', 'cystitis'].indexOf(i.id); return o === -1 ? 100 : 3 + o; };
         s.issues.sort(function (a, b) { return rank(a) - rank(b); });
         return s;
       }
@@ -74,15 +80,32 @@
     moon: '<path d="M20 14A8 8 0 1 1 10 4a6 6 0 0 0 10 10z"/>',
     sliders: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
+    info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5.500M12 7.800h.01"/>',
     back: '<path d="M15 5l-7 7 7 7"/>',
     chevR: '<path d="M9 5l7 7-7 7"/>',
     leaf: '<path d="M5 19c0-9 5-14 14-14 0 9-5 14-14 14zM5 19l8-8"/>',
     target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/>',
     trend: '<path d="M3 17l6-6 4 4 8-8"/>',
     x: '<path d="M6 6l12 12M18 6L6 18"/>',
+    head: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/>',
+    eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+    ear: '<path d="M7 10a5 5 0 0 1 10 0c0 3-3 3-3 6a2.5 2.5 0 0 1-5 0"/><path d="M12 10a2 2 0 0 1 2 2"/>',
+    tooth: '<path d="M7 3c-2 0-3 2-3 4 0 3 2 4 2 7 0 3 1 7 3 7 2 0 1-4 3-4s1 4 3 4c2 0 3-4 3-7 0-3 2-4 2-7 0-2-1-4-3-4-2 0-3 1-5 1S9 3 7 3z"/>',
+    lungs: '<path d="M12 4v8M10 9C6 9 4 14 4 18c0 1.5 1.5 2 3 1.5L10 18zM14 9c4 0 6 5 6 9 0 1.5-1.5 2-3 1.5L14 18z"/>',
+    stomach: '<path d="M9 3v4c-3 2-4 5-4 8a5 5 0 0 0 10 0c0-2-2-3-4-3-1 0-2-1-2-3V3"/>',
+    bone: '<path d="M8 16L16 8"/><circle cx="6" cy="16" r="2"/><circle cx="8" cy="18" r="2"/><circle cx="16" cy="6" r="2"/><circle cx="18" cy="8" r="2"/>',
+    womb: '<path d="M12 21v-5M8 4c-3 0-4 3-4 5s2 3 4 3M16 4c3 0 4 3 4 5s-2 3-4 3M8 12c0 3 1.5 4 4 4s4-1 4-4"/>',
+    spine: '<rect x="6.5" y="1.8" width="8" height="3.6" rx="1.8" fill="currentColor" fill-opacity=".22"/><rect x="6.5" y="6.3" width="8" height="3.6" rx="1.8" fill="currentColor" fill-opacity=".22"/><rect x="6.5" y="10.8" width="8" height="3.6" rx="1.8" fill="currentColor" fill-opacity=".22"/><rect x="6.5" y="15.3" width="8" height="3.6" rx="1.8" fill="currentColor" fill-opacity=".22"/><path d="M14.5 3.6h3.5M14.5 8.1h3.5M14.5 12.6h3.5M14.5 17.1h3.5"/><path d="M8 20.2h5l-2.5 3z" fill="currentColor" fill-opacity=".22"/>',
+    headache: '<path d="M7 21.5v-4.3C4.8 15.8 3.5 13.6 3.5 10.8A8 8 0 0 1 12 3a8 8 0 0 1 8 7.8c0 1 .5 1.7 1.2 2.7l-1.7 1v2.8l-2.5.5v3.7z" fill="currentColor" fill-opacity=".22"/><path d="M12.8 6.3L9.3 11.3h3.4l-2.5 4.9"/>',
+    neck: '<circle cx="12" cy="5.2" r="2.8" fill="currentColor" fill-opacity=".22"/><rect x="10.3" y="8.2" width="3.4" height="6.2" rx=".8" fill="currentColor" fill-opacity=".22"/><path d="M10.6 10.3h2.8M10.6 12.3h2.8"/><path d="M3 21c0-3.600 2.800-5.600 7.300-6.300h3.400c4.500.7 7.300 2.700 7.300 6.300z" fill="currentColor" fill-opacity=".22"/>',
+    uterus: '<path d="M12 3.500c-2.800 0-4.200 1.800-4.200 4 0 2.800 1.800 4.200 1.800 6.700h4.800c0-2.500 1.800-3.900 1.800-6.700 0-2.200-1.400-4-4.200-4z" fill="currentColor" fill-opacity=".22"/><path d="M12 14.200V21M7.900 7.200C5.400 6.700 3.800 8.200 3.800 10.400M16.100 7.200c2.500-.5 4.100 1 4.100 3.200"/><circle cx="3.800" cy="12.700" r="2" fill="currentColor" fill-opacity=".22"/><circle cx="20.200" cy="12.700" r="2" fill="currentColor" fill-opacity=".22"/>',
+    breast: '<path d="M4 11.500C4 7 7.600 4.500 12 4.500s8 2.500 8 7c0 4.500-3.500 8-8 8s-8-3.500-8-8z" fill="currentColor" fill-opacity=".22"/><circle cx="12" cy="12" r="3.200" fill="currentColor" fill-opacity=".22"/><circle cx="12" cy="12" r="1" fill="currentColor"/><path d="M3.200 3.800L4.800 5.400M20.800 3.800L19.200 5.400M12 1.500v1.800"/>',
+    gut: '<defs><mask id="gutm"><rect width="24" height="24" fill="#fff"/><path d="M7 3.8h10a3.2 3.2 0 0 1 0 6.4H7a3.2 3.2 0 0 0 0 6.4h8a1.9 1.9 0 0 1 0 3.8h-3" fill="none" stroke="#000" stroke-width="1.8"/></mask></defs><path d="M7 3.8h10a3.2 3.2 0 0 1 0 6.4H7a3.2 3.2 0 0 0 0 6.4h8a1.9 1.9 0 0 1 0 3.8h-3" fill="none" stroke-width="4" mask="url(#gutm)"/><path d="M7 3.8h10a3.2 3.2 0 0 1 0 6.4H7a3.2 3.2 0 0 0 0 6.4h8a1.9 1.9 0 0 1 0 3.8h-3" fill="none" stroke-width="1.8" stroke-opacity=".22"/>',
+    bladder: '<path d="M12 2.500V6M7.500 9C7.500 7 9.300 6 12 6s4.500 1 4.500 3c0 4.500-1 8.500-2 11.500h-5c-1-3-2-7-2-11.500z" fill="currentColor" fill-opacity=".22"/><path d="M9.500 12.500c1-1 2 1 3 0s2 1 2.500 0M7.800 7.800L4.800 4.500M16.200 7.800l3-3.300"/>',
     trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>'
   };
-  function icon(name) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (ICONS[name] || ICONS.pulse) + '</svg>'; }
+  var FINE = ['spine', 'headache', 'neck', 'uterus', 'breast', 'gut', 'bladder'];
+  function icon(name) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="' + (FINE.indexOf(name) !== -1 ? '1.5' : '2') + '"' + (FINE.indexOf(name) !== -1 ? ' class="fine"' : '') + ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (ICONS[name] || ICONS.pulse) + '</svg>'; }
 
   /* ---------- Cycle maths ---------- */
   var PHASES = {
@@ -237,6 +260,7 @@
   function go(view, extra) {
     if (view === 'settings') ui.bcOpen = false;
     if (view === 'eat') ui.eatMore = false;
+    if (view !== ui.view) ui.dayPick = null;
     ui.view = view;
     if (extra) for (var k in extra) ui[k] = extra[k];
     render();
@@ -297,19 +321,23 @@
   }
   function moonRing(info, whenShort, compact) {
     var cl = info.cl, R = 140, C = 170, mr = Math.min(13.5, 0.4 * 2 * Math.PI * R / cl), parts = '';
+    var pick = compact && ui.dayPick && ui.dayPick !== info.day ? ui.dayPick : null;
     for (var d = 1; d <= cl; d++) {
       var a = (d - 0.5) / cl * 2 * Math.PI - Math.PI / 2, cx = C + R * Math.cos(a), cy = C + R * Math.sin(a);
       var f = (d - 0.5) / cl, k = (1 - Math.cos(f * 2 * Math.PI)) / 2, waning = f > 0.5;
       var col = PHASES[phaseOfDay(d)].hex;
+      if (compact) parts += '<g data-act="moonDay" data-d="' + d + '" style="cursor:pointer" role="button" aria-label="Cycle day ' + d + '">';
       parts += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="' + mr.toFixed(1) + '" fill="#FBF3EA" stroke="' + col + '" stroke-width="2"/>';
       var p = moonPath(0, 0, mr - 1, k, waning);
       if (p) parts += '<path transform="translate(' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ')" d="' + p + '" fill="' + col + '"/>';
-      if (d === info.day) parts += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="' + (mr + 6).toFixed(1) + '" fill="none" stroke="#2A2433" stroke-width="3"/>';
+      if (d === info.day) parts += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="' + (mr + 6).toFixed(1) + '" fill="none" stroke="#2A2433" stroke-width="' + (pick ? 1.5 : 3) + '"' + (pick ? ' stroke-dasharray="3 3"' : '') + '/>';
+      if (d === pick) parts += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="' + (mr + 6).toFixed(1) + '" fill="none" stroke="#2A2433" stroke-width="3"/>';
+      if (compact) parts += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="' + (mr + 6).toFixed(1) + '" fill="transparent"/></g>';
     }
     var ph = PHASES[info.phase];
     if (compact) return '<svg class="donut" viewBox="0 0 340 340" role="img" aria-label="Cycle day ' + info.rawDay + ' of about ' + cl + ', ' + ph.label + ' phase">' + parts +
-      '<text x="170" y="150" text-anchor="middle" font-size="26" font-weight="500" fill="#2A2433">Day</text>' +
-      '<text x="170" y="214" text-anchor="middle" font-size="76" font-weight="700" fill="#2A2433">' + info.rawDay + '</text></svg>';
+      '<text x="170" y="150" text-anchor="middle" font-size="26" font-weight="500" fill="#2A2433" pointer-events="none">Day</text>' +
+      '<text x="170" y="214" text-anchor="middle" font-size="76" font-weight="700" fill="#2A2433" pointer-events="none">' + (pick || info.rawDay) + '</text></svg>';
     return '<svg class="donut" viewBox="0 0 340 340" role="img" aria-label="Cycle day ' + info.rawDay + ' of about ' + cl + ', ' + ph.label + ' phase">' + parts +
       '<text x="170" y="138" text-anchor="middle" font-size="15" font-weight="700" letter-spacing="2" fill="' + ph.hex + '">' + ph.label.toUpperCase() + ' PHASE</text>' +
       '<text x="170" y="192" text-anchor="middle" font-size="56" font-weight="700" fill="#2A2433">Day ' + info.rawDay + '</text>' +
@@ -317,10 +345,10 @@
   }
   function gauss(t, mu, sl, sr) { var s = t < mu ? sl : sr, z = (t - mu) / s; return Math.exp(-z * z / 2); }
   var HORMONES = [
-    { key: 'Estrogen', hex: '#8B3A5A', area: true, f: function (t, od) { return 0.1 + 0.9 * gauss(t, od - 1, 4.4, 2) + 0.5 * gauss(t, od + 7, 3.6, 3.6); } },
-    { key: 'Progesterone', hex: '#4B4BA0', area: true, f: function (t, od) { return 0.03 + 0.85 * gauss(t, od + 7, 3.4, 3.6); } },
-    { key: 'Testosterone', hex: '#B8862F', area: false, f: function (t, od) { return 0.2 + 0.14 * gauss(t, od, 3, 3); } },
-    { key: 'LH', hex: '#3F7A63', area: true, f: function (t, od) { return 0.04 + 0.96 * gauss(t, od - 0.5, 0.9, 0.9); } }
+    { key: 'Estrogen', hex: '#E4572E', area: true, f: function (t, od) { return 0.1 + 0.9 * gauss(t, od - 1, 4.4, 2) + 0.5 * gauss(t, od + 7, 3.6, 3.6); } },
+    { key: 'Progesterone', hex: '#D6479B', area: true, f: function (t, od) { return 0.03 + 0.85 * gauss(t, od + 7, 3.4, 3.6); } },
+    { key: 'Testosterone', hex: '#5F6B7A', area: false, f: function (t, od) { return 0.2 + 0.14 * gauss(t, od, 3, 3); } },
+    { key: 'LH', hex: '#1EA3C2', area: true, f: function (t, od) { return 0.04 + 0.96 * gauss(t, od - 0.5, 0.9, 0.9); } }
   ];
   function hormoneNote(info) {
     var od = info.cl - 14, d = info.rawDay;
@@ -335,25 +363,116 @@
     function X(t) { return x0 + (t - 1) / (cl - 1) * (x1 - x0); }
     function Y(v) { return yb - v * (yb - yt); }
     var svg = '', i, t, pts, dpath;
-    HORMONES.forEach(function (hm) {
-      var line = '';
+    var sel = ui.hSel || null;
+    var ordered = HORMONES.slice().sort(function (a, b) { return (a.key === sel) - (b.key === sel); });
+    ordered.forEach(function (hm) {
+      var line = '', dim = sel && sel !== hm.key, on = sel === hm.key;
       for (t = 1, i = 0; t <= cl + 0.001; t += 0.25, i++) line += (i ? 'L' : 'M') + X(t).toFixed(1) + ' ' + Y(hm.f(t, od)).toFixed(1);
-      if (hm.area) svg += '<path d="' + line + 'L' + X(cl).toFixed(1) + ' ' + yb + 'L' + X(1).toFixed(1) + ' ' + yb + 'Z" fill="' + hm.hex + '" opacity="0.14"/>';
-      svg += '<path d="' + line + '" fill="none" stroke="' + hm.hex + '" stroke-width="2.5" stroke-linejoin="round"/>';
+      if (hm.area) svg += '<path d="' + line + 'L' + X(cl).toFixed(1) + ' ' + yb + 'L' + X(1).toFixed(1) + ' ' + yb + 'Z" fill="' + hm.hex + '" opacity="' + (dim ? 0.03 : on ? 0.28 : 0.14) + '"/>';
+      svg += '<path d="' + line + '" fill="none" stroke="' + hm.hex + '" stroke-width="' + (on ? 3.5 : 2.5) + '" stroke-linejoin="round" opacity="' + (dim ? 0.18 : 1) + '"/>';
     });
     var mx = X(Math.min(info.day, cl)).toFixed(1);
     svg += '<line x1="' + mx + '" y1="' + (yt - 2) + '" x2="' + mx + '" y2="' + yb + '" stroke="#2A2433" stroke-width="2"/><circle cx="' + mx + '" cy="' + (yt - 2) + '" r="5" fill="#2A2433"/>';
     var bars = phaseLayout().map(function (p) {
       var a = X(p.from - 0.5 < 1 ? 1 : p.from - 0.5), b = X(p.to + 0.5 > cl ? cl : p.to + 0.5);
-      return '<rect x="' + (a + 1).toFixed(1) + '" y="' + (yb + 6) + '" width="' + Math.max(2, b - a - 2).toFixed(1) + '" height="7" rx="3.5" fill="' + PHASES[p.key].hex + '"/>';
+      return '<rect x="' + (a + 1).toFixed(1) + '" y="' + (yb + 6) + '" width="' + Math.max(2, b - a - 2).toFixed(1) + '" height="7" rx="3.5" fill="' + PHASES[p.key].hex + '"/><text x="' + ((a + b) / 2).toFixed(1) + '" y="' + (yb + 24) + '" text-anchor="middle" font-size="9.5" font-weight="700" fill="#6B6573">' + PHASES[p.key].label + '</text>';
     }).join('');
-    var legend = HORMONES.map(function (hm) { return '<span><i style="background:' + hm.hex + '"></i>' + hm.key + '</span>'; }).join('');
-    return '<section class="hero hormones compact"><h2>Your hormones</h2><div class="legend">' + legend + '</div>' +
-      '<svg viewBox="0 0 ' + W + ' ' + (H + 8) + '" class="hchart" role="img" aria-label="Typical hormone levels across your cycle">' + svg + bars + '</svg>' +
-      '<p class="hnote">' + esc(hormoneNote(info)) + '</p></section>';
+    var legend = HORMONES.map(function (hm) { return '<button class="hleg' + (sel === hm.key ? ' on' : sel ? ' off' : '') + '" data-act="hormone" data-k="' + hm.key + '" aria-pressed="' + (sel === hm.key) + '"><i style="background:' + hm.hex + '"></i>' + hm.key + '</button>'; }).join('');
+    return '<section class="card hpage"><div class="legend">' + legend + '</div>' +
+      '<svg viewBox="0 0 ' + W + ' ' + (H + 22) + '" class="hchart" data-act="chart" role="img" aria-label="Typical hormone levels across your cycle">' + svg + bars + '</svg>' +
+      hormoneDesc(info) +
+      '</section>';
   }
 
+  var HORMONE_INFO = [
+    ['Estrogen', '#E4572E', 'The main growth hormone of the cycle. It builds up the womb lining, helps an egg mature, and supports bone strength, skin, and mood-lifting brain chemicals like serotonin. It is also why many people feel brighter and more social when it is high.'],
+    ['Progesterone', '#D6479B', 'The calming, protective hormone. It prepares and holds the womb lining in place in case of pregnancy, and it raises body temperature slightly. It also acts on the brain in a sedating way, which is why it can bring sleepiness, a bigger appetite, bloating and sore breasts.'],
+    ['Testosterone', '#5F6B7A', 'Yes, you make it too, in smaller amounts. It supports sex drive, muscle and bone, and motivation and energy. It is fairly steady through the cycle, with a small lift around ovulation.'],
+    ['LH', '#1EA3C2', 'Short for luteinizing hormone. It is the trigger that makes the ovary release a mature egg, which is ovulation. After that it helps the empty follicle turn into the structure that makes progesterone.']
+  ];
+  function highestText(hm, info) {
+    var cl = info.cl, od = cl - 14, vals = [], t;
+    for (t = 1; t <= cl; t++) vals.push(hm.f(t, od));
+    var mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals);
+    var hit = phaseLayout().filter(function (p) {
+      var pk = 0; for (var d = p.from; d <= p.to; d++) pk = Math.max(pk, hm.f(d, od));
+      return (pk - mn) / (mx - mn) >= 0.85;
+    });
+    if (!hit.length) return '';
+    var from = hit[0].from, to = hit[hit.length - 1].to;
+    return 'Highest in the ' + hit.map(function (p) { return PHASES[p.key].label.toLowerCase(); }).join(' and ') + (hit.length > 1 ? ' phases' : ' phase') + ', around days ' + from + ' to ' + to + '.';
+  }
+  function hormoneDesc(info) {
+    var sel = ui.hSel, r = HORMONE_INFO.filter(function (x) { return x[0] === sel; })[0], hm = HORMONES.filter(function (x) { return x.key === sel; })[0];
+    if (!r || !hm) return '<p class="hhint">Tap a hormone, or a line on the chart, to see what it does.</p>';
+    return '<div class="hdesc" style="border-left-color:' + r[1] + '"><b style="color:' + r[1] + '">' + r[0] + '</b><p>' + esc(r[2]) + '</p><p class="hhigh">' + esc(highestText(hm, info)) + '</p></div>';
+  }
+  function viewHormones() {
+    var info = cycleInfo(todayIso());
+    var h = banner('Learn', 'Your hormones', 'today');
+    if (!info) return h + '<p class="sub">Add your last period start on the Today screen to see your hormone chart.</p>' + navBar('today');
+    h += '<p class="sub">A typical pattern across a ' + info.cl + '-day cycle. The black line shows where you are today. Everyone is different, so treat it as a guide.</p>';
+    h += hormoneCard(info);
+    return h + navBar('today');
+  }
   function hasGroups(T, body) { return !!T.know && T.know.some(function (g) { return (g[0] === 'Body') === body; }); }
+  function phaseTxt(info) {
+    if (ui.dayPick && ui.dayPick !== info.day) return dayDetails(info, ui.dayPick);
+    var ph = PHASES[info.phase];
+    var whenShort = info.late ? 'Period may be late' : info.phase === 'period' ? 'Period day ' + info.rawDay + ' of about ' + db.settings.periodLength : 'Period in about ' + info.toPeriod + (info.toPeriod === 1 ? ' day' : ' days');
+    return '<span class="plabel" style="color:' + ph.hex + '">' + ph.label + ' phase</span><span class="pwhen">' + esc(whenShort) + '</span>';
+  }
+  /* Drag around the moon ring to scrub through the cycle days. Updates in place so the dragged element survives. */
+  var scrub = null, suppressClick = false;
+  function scrubTo(svg, ev) {
+    var info = cycleInfo(todayIso()); if (!info) return;
+    var r = svg.getBoundingClientRect(), dx = ev.clientX - (r.left + r.width / 2), dy = ev.clientY - (r.top + r.height / 2);
+    var ang = Math.atan2(dy, dx) + Math.PI / 2; if (ang < 0) ang += 2 * Math.PI;
+    var d = Math.min(info.cl, Math.floor(ang / (2 * Math.PI) * info.cl) + 1);
+    var want = d === info.day ? null : d;
+    if (want === (ui.dayPick || null)) return;
+    ui.dayPick = want;
+    var tmp = document.createElement('div'); tmp.innerHTML = moonRing(info, '', true);
+    svg.innerHTML = tmp.firstChild.innerHTML;
+    var txt = document.querySelector('.phase-txt'); if (txt) txt.innerHTML = phaseTxt(info);
+  }
+  document.addEventListener('pointerdown', function (ev) {
+    var svg = ev.target.closest && ev.target.closest('.ring svg.donut');
+    if (!svg) return;
+    scrub = { svg: svg, x: ev.clientX, y: ev.clientY, moved: false, id: ev.pointerId };
+  });
+  document.addEventListener('pointermove', function (ev) {
+    if (!scrub || ev.pointerId !== scrub.id) return;
+    if (!scrub.moved) {
+      if (Math.abs(ev.clientX - scrub.x) + Math.abs(ev.clientY - scrub.y) < 8) return;
+      scrub.moved = true;
+      try { scrub.svg.setPointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
+    }
+    scrubTo(scrub.svg, ev);
+  });
+  function endScrub() { if (scrub && scrub.moved) { suppressClick = true; setTimeout(function () { suppressClick = false; }, 50); } scrub = null; }
+  document.addEventListener('pointerup', endScrub);
+  document.addEventListener('pointercancel', endScrub);
+  document.addEventListener('click', function (ev) { if (suppressClick) { ev.stopPropagation(); ev.preventDefault(); } }, true);
+  function dayDetails(info, d) {
+    var cl = info.cl, od = cl - 14, ph = PHASES[phaseOfDay(d)], date = addDays(info.start, d - 1), n = diffDays(date, todayIso());
+    var when = shortDate(date) + (n === 0 ? ' · today' : n === 1 ? ' · tomorrow' : n === -1 ? ' · yesterday' : n > 0 ? ' · in ' + n + ' days' : ' · ' + (-n) + ' days ago');
+    var high = HORMONES.filter(function (hm) {
+      var mn = 9, mx = -9, t; for (t = 1; t <= cl; t++) { var v = hm.f(t, od); mn = Math.min(mn, v); mx = Math.max(mx, v); }
+      return (hm.f(d, od) - mn) / (mx - mn) >= 0.7;
+    }).map(function (hm) { return hm.key; });
+    var hl = high.length ? 'High: ' + high.join(', ') : 'All hormones low';
+    var logged = '';
+    if (n <= 0) {
+      var items = db.entries.filter(function (e) { return e.start <= date && (e.end || todayIso()) >= date; }).map(function (e) { var iss = issueById(e.issueId); return (iss ? iss.name : 'Entry') + (typeof e.strength === 'number' ? ' ' + e.strength + '/10' : ''); });
+      if (db.periodStarts.indexOf(date) !== -1) items.unshift('Period started');
+      logged = items.length ? 'Logged: ' + items.slice(0, 2).join(', ') + (items.length > 2 ? ' +' + (items.length - 2) : '') : '';
+    }
+    return '<span class="plabel" style="color:' + ph.hex + '">' + ph.label + ' phase</span><span class="pwhen sm">' + esc(when) + '</span>' +
+      (n <= 0 ? '<span class="pmini">Next one on ' + esc(shortDate(addDays(info.start, cl + d - 1))) + '</span>' : '') +
+
+      '<button class="plink" data-act="moonDay" data-d="' + d + '">Back to today</button>';
+  }
   function viewToday() {
     var info = cycleInfo(todayIso());
     var h = '<div class="banner"><div><small>' + esc(longToday()) + '</small><h1>Today</h1></div></div>';
@@ -369,9 +488,8 @@
     else if (info.phase === 'period') when = 'Period day ' + info.rawDay + ' of about ' + db.settings.periodLength;
     else when = 'Period likely in about ' + info.toPeriod + (info.toPeriod === 1 ? ' day' : ' days');
     var legend = phaseLayout().map(function (p) { return '<span><i style="background:' + PHASES[p.key].hex + '"></i>' + PHASES[p.key].label + '</span>'; }).join('');
-    var whenShort = info.late ? 'Period may be late' : info.phase === 'period' ? 'Period day ' + info.rawDay + ' of about ' + db.settings.periodLength : 'Period in about ' + info.toPeriod + (info.toPeriod === 1 ? ' day' : ' days');
-    h += '<section class="hero phase-hero"><div class="ring">' + moonRing(info, whenShort, true) + '</div><div class="phase-txt"><span class="plabel" style="color:' + ph.hex + '">' + ph.label + ' phase</span><span class="pwhen">' + esc(whenShort) + '</span></div></section>';
-    h += hormoneCard(info);
+    h += '<section class="hero phase-hero"><div class="ph-top"><div class="ring">' + moonRing(info, '', true) + '</div><div class="phase-txt">' + phaseTxt(info) + '</div></div>' +
+      '<button class="info-btn" data-act="hormones" aria-label="Your hormones">' + icon('info') + '</button></section>';
     if (isHormonal()) h += '<p class="quiet hbc"><b>Hormonal method:</b> phases are only a rough guide.</p>';
     var gTap = hasGroups(T, false);
     h += '<section class="card combo"><div class="blk likely tap" data-act="learn" data-k="going" role="button" tabindex="0"><div class="bh"><h2>What’s likely going on</h2><span class="more">Read more ' + icon('chevR') + '</span></div><p class="clamp">' + esc(T.likely) + '</p></div>' +
@@ -388,16 +506,18 @@
   function viewLog() {
     function row(i) {
       var sub = (i.pinned && i.sub) ? i.sub : lastLoggedText(i.id);
-      return '<button class="big-row" data-act="pick" data-id="' + esc(i.id) + '"><span class="icon-tile ' + i.tile + '">' + icon(i.icon) + '</span><span><span class="t">' + esc(i.name) + '</span><span class="s">' + esc(sub) + '</span></span>' +
+      return '<button class="big-row" data-act="pick" data-id="' + esc(i.id) + '"' + (i.preset ? ' data-preset="1"' : '') + '><span class="icon-tile ' + i.tile + '">' + icon(i.icon) + '</span><span><span class="t">' + esc(i.name) + '</span><span class="s">' + esc(sub) + '</span></span>' +
         (i.kind === 'period' || i.kind === 'tap' ? '' : '<span class="chev">' + icon('chevR') + '</span>') + '</button>';
     }
     var pinned = db.issues.filter(function (i) { return i.pinned; });
     var yours = db.issues.filter(function (i) { return !i.pinned; });
+    // Ready-made issues are always listed, so there is no need to "add" them first.
+    PRESETS.forEach(function (p) { if (!issueById(p.id)) yours.push(Object.assign({ preset: true }, p)); });
     var h = banner('Log', 'What’s worth noting?', 'today') +
       '<p class="sub" style="margin-top:8px">Everything here is optional. Only log what you want to remember.</p>' +
       '<div class="section-h" style="color:var(--muted);font-weight:500">Pinned</div>' + pinned.map(row).join('');
     h += '<div class="section-h" style="color:var(--muted);font-weight:500">Your issues</div>' + yours.map(row).join('');
-    h += '<button class="dashed" data-act="addIssue">' + icon('plus') + ' Add an issue</button>';
+    h += '<button class="dashed" data-act="addIssue">' + icon('plus') + ' Something else? Add a new issue</button>';
     h += '<p class="quiet">No streaks, no reminders. Nothing is ever overdue.</p>';
     return h;
   }
@@ -441,9 +561,13 @@
     return '<div class="cal"><div class="cal-head"><button data-act="month" data-n="-1" aria-label="Previous month">' + icon('back') + '</button><span>' + MONTHS[mo] + ' ' + y + '</span>' +
       '<button data-act="month" data-n="1" ' + (thisMonth ? 'disabled' : '') + ' aria-label="Next month">' + icon('chevR') + '</button></div><div class="cal-grid">' + cells + '</div></div>';
   }
+  function dayWord(s) {
+    var n = diffDays(todayIso(), s);
+    return n === 0 ? 'Today' : n === 1 ? 'Yesterday' : shortDate(s);
+  }
   function whenText(d) {
     if (d.ongoing) return shortDate(d.start) + ' to now, ongoing';
-    if (!d.end || d.end === d.start) return shortDate(d.start);
+    if (!d.end || d.end === d.start) return dayWord(d.start);
     return shortDate(d.start) + ' to ' + shortDate(d.end);
   }
   function insightText(issue) {
@@ -465,12 +589,25 @@
     return '<div class="insight">' + esc(txt) + '</div>';
   }
 
+  function historyCard(issue) {
+    var list = db.entries.filter(function (e) { return e.issueId === issue.id; }).sort(function (a, b) { return a.start < b.start ? 1 : a.start > b.start ? -1 : 0; });
+    if (!list.length) return '<div class="last-card"><b>First time logging this</b><span>Next time you will see your history here.</span></div>';
+    var l = list[0], last = l.end || todayIso(), n = diffDays(todayIso(), last);
+    var ago = n <= 0 ? 'Today' : n === 1 ? 'Yesterday' : n + ' days ago';
+    var head = (n <= 0 && !l.end) ? 'Still going since ' + shortDate(l.start) : 'Last time: ' + ago.toLowerCase();
+    var rows = list.slice(0, 5).map(function (e) {
+      var dt = e.end && e.end !== e.start ? shortDate(e.start) + ' to ' + shortDate(e.end) : shortDate(e.start);
+      return '<li><span>' + esc(dt) + '</span><em>' + esc(describeEntry(e).detail || '—') + '</em></li>';
+    }).join('');
+    return '<div class="last-card"><b>' + esc(head) + '</b><span>' + list.length + (list.length === 1 ? ' time' : ' times') + ' logged in total</span><ul>' + rows + '</ul></div>';
+  }
   function viewIssue() {
     var d = ui.draft, issue = issueById(d.issueId);
     var ci = cycleInfo(todayIso());
     var h = banner('Log', issue.name, 'log') +
       '<p class="sub">' + (ci ? 'Cycle day ' + ci.rawDay + ' is added for you.' : 'Add a few details if you like.') + '</p>';
     h += insightText(issue);
+    if (issue.kind !== 'poop' && issue.kind !== 'period') h += historyCard(issue);
 
     if (issue.kind === 'poop') {
       h += '<button class="btn-outline warn ' + (d.noPoo ? 'on' : '') + '" style="margin-top:18px" data-act="noPoo">' + (d.noPoo ? '✓ ' : '') + 'I didn’t poo</button>';
@@ -495,9 +632,9 @@
     if (issue.kind === 'bloat') {
       h += '<div class="label">How bloated</div><div class="scale scale3">' + [[1, 'Mild'], [2, 'Noticeable'], [3, 'Heavy']].map(function (o) { return '<button class="opt ' + (d.bloat === o[0] ? 'on' : '') + '" data-act="bloat" data-n="' + o[0] + '">' + o[1] + '</button>'; }).join('') + '</div>';
     }
-    h += '<div class="label" style="margin-bottom:4px">When did you have it</div><div class="when">' + esc(whenText(d)) + '</div><p class="sub" style="margin:2px 0 0">Tap a day to start a new range.</p>';
-    h += calendarHtml(d);
-    h += '<button class="btn-outline ' + (d.ongoing ? 'on' : '') + '" data-act="ongoing">Still going, no end date</button>';
+    h += '<div class="label" style="margin-bottom:4px">When</div><div class="when-row"><div class="when">' + esc(whenText(d)) + '</div>' +
+      '<button class="link-btn" data-act="toggleCal">' + (d.showCal ? 'Done' : 'Change date or range') + '</button></div>';
+    if (d.showCal) h += '<p class="sub" style="margin:2px 0 0">Tap a day. Tap a later day to make it a range.</p>' + calendarHtml(d);
     h += '<div class="label">Note for yourself</div><textarea data-input="note" placeholder="What you ate, stress, travel, anything">' + esc(d.note) + '</textarea>';
     h += '<button class="btn" data-act="saveEntry">Save</button>';
     return h;
@@ -506,20 +643,14 @@
   function viewAddIssue() {
     var d = ui.draft;
     var tiles = ISSUE_TILES;
-    var presets = PRESETS.map(function (p) {
-      var added = !!issueById(p.id);
-      return '<button class="big-row" ' + (added ? 'disabled style="opacity:.55"' : 'data-act="addPreset" data-id="' + p.id + '"') + '><span class="icon-tile ' + p.tile + '">' + icon(p.icon) + '</span><span><span class="t">' + esc(p.name) + '</span><span class="s">' + esc(added ? 'Already added' : p.sub) + '</span></span>' +
-        (added ? '' : '<span class="chev">' + icon('plus') + '</span>') + '</button>';
-    }).join('');
     return banner('Log', 'Add an issue', 'log') +
-      '<p class="sub">Pick a ready-made one, or make your own.</p>' +
-      '<div class="section-h" style="color:var(--muted);font-weight:500">Ready-made</div>' + presets +
-      '<div class="section-h" style="color:var(--muted);font-weight:500;margin-top:26px">Or make your own</div>' +
+      '<p class="sub">For something that is not in the list. It will then stay there for next time.</p>' +
       '<div class="label" style="margin-top:6px">Name</div><input type="text" data-input="name" maxlength="40" placeholder="e.g. Headache" value="' + esc(d.name) + '">' +
-      '<div class="label">Icon</div><div class="icon-pick">' + tiles.map(function (t, i) { return '<button class="' + (d.tileIdx === i ? 'on' : '') + '" data-act="tile" data-n="' + i + '" aria-label="Icon ' + (i + 1) + '"><span class="icon-tile ' + t[1] + '">' + icon(t[0]) + '</span></button>'; }).join('') + '</div>' +
+      '<div class="label">Icon</div><div class="icon-pick">' + tiles.map(function (t, i) { return '<button class="' + (d.tileIdx === i ? 'on' : '') + '" data-act="tile" data-n="' + i + '" aria-label="' + t[2] + '"><span class="icon-tile ' + t[1] + '">' + icon(t[0]) + '</span><span class="lbl">' + t[2] + '</span></button>'; }).join('') + '</div>' +
       '<button class="btn" data-act="saveIssue">Add issue</button>';
   }
-  var ISSUE_TILES = [['pulse', 'tile-yellow'], ['bloat', 'tile-lilac'], ['heart', 'tile-pink'], ['bolt', 'tile-orange'], ['moon', 'tile-blue']];
+  var ISSUE_TILES = [['headache', 'tile-yellow', 'Head'], ['neck', 'tile-yellow', 'Neck'], ['spine', 'tile-yellow', 'Back'], ['lungs', 'tile-blue', 'Chest'], ['heart', 'tile-pink', 'Heart'],
+    ['breast', 'tile-pink', 'Breast'], ['gut', 'tile-lilac', 'Gut'], ['uterus', 'tile-pink', 'Womb'], ['bladder', 'tile-blue', 'Bladder'], ['eye', 'tile-orange', 'Eyes']];
 
   var BC = [
     ['none', 'None', 'Natural cycle', 'Cycle phases and phase-based tips work as shown.'],
@@ -956,13 +1087,14 @@ function viewLearn() {
     else if (v === 'patterns') html = viewPatterns();
     else if (v === 'eat') html = viewEat();
     else if (v === 'learn') html = viewLearn();
+    else if (v === 'hormones') html = viewHormones();
     else if (v === 'importNotes') html = viewImportNotes();
     else if (v === 'log') html = viewLog();
     else if (v === 'issue') html = viewIssue();
     else if (v === 'addIssue') html = viewAddIssue();
     else if (v === 'history') html = viewHistory();
     else html = viewSettings();
-    app.className = (v === 'today' ? 'today ' : '') + ((v === 'today' || v === 'patterns' || v === 'eat' || v === 'learn' || v === 'settings') ? '' : 'noNav');
+    app.className = (v === 'today' ? 'today ' : '') + ((v === 'today' || v === 'patterns' || v === 'eat' || v === 'learn' || v === 'hormones' || v === 'settings') ? '' : 'noNav');
     app.innerHTML = html;
   }
 
@@ -993,6 +1125,26 @@ impGo: function () {
   var undo = commitNotes(r.rows), n = r.rows.length;
   ui.imp = null; ui.impText = ""; go("today"); toast(n + (n === 1 ? " entry" : " entries") + " imported", undo);
 },
+    hormones: function () { ui.hSel = null; go('hormones'); },
+    moonDay: function (el) {
+      var d = +el.getAttribute('data-d');
+      ui.dayPick = ui.dayPick === d ? null : d; render();
+    },
+    chart: function (el, ev) {
+      var info = cycleInfo(todayIso()); if (!info) return;
+      var r = el.getBoundingClientRect(), W = 340, H = 114, x0 = 4, x1 = W - 4, yb = 76, yt = 10, cl = info.cl, od = cl - 14;
+      var vx = (ev.clientX - r.left) * W / r.width, vy = (ev.clientY - r.top) * H / r.height;
+      var t0 = 1 + (vx - x0) / (x1 - x0) * (cl - 1), best = null, bd = 1e9;
+      HORMONES.forEach(function (hm) {
+        for (var dt = -1.5; dt <= 1.5; dt += 0.25) {
+          var t = Math.min(cl, Math.max(1, t0 + dt)), px = x0 + (t - 1) / (cl - 1) * (x1 - x0), py = yb - hm.f(t, od) * (yb - yt);
+          var d = Math.sqrt((px - vx) * (px - vx) + (py - vy) * (py - vy));
+          if (d < bd) { bd = d; best = hm.key; }
+        }
+      });
+      ui.hSel = bd <= 16 && best !== ui.hSel ? best : null; render();
+    },
+    hormone: function (el) { var k = el.getAttribute('data-k'); ui.hSel = ui.hSel === k ? null : k; render(); },
     learn: function (el) { go('learn', { learnKind: el.getAttribute('data-k') }); },
     go: function (el) { go(el.getAttribute('data-v')); },
     firstStart: function () {
@@ -1001,7 +1153,12 @@ impGo: function () {
       db.periodStarts.push(v); save(); render();
     },
     pick: function (el) {
-      var issue = issueById(el.getAttribute('data-id'));
+      var id = el.getAttribute('data-id'), issue = issueById(id);
+      if (!issue) {
+        var p = PRESETS.filter(function (x) { return x.id === id; })[0];
+        if (!p) return;
+        issue = JSON.parse(JSON.stringify(p)); db.issues.push(issue); save();
+      }
       if (issue.kind === 'period') {
         if (addPeriodStart(todayIso(), true)) go('today');
       } else if (issue.kind === 'tap') {
@@ -1023,11 +1180,10 @@ impGo: function () {
     day: function (el) {
       var d = ui.draft, ds = el.getAttribute('data-d');
       if (d.start && d.end === d.start && !d.ongoing && ds > d.start && d.pickingEnd) { d.end = ds; d.pickingEnd = false; }
-      else if (d.ongoing && ds > d.start) { d.end = ds; d.ongoing = false; d.pickingEnd = false; }
       else { d.start = ds; d.end = ds; d.ongoing = false; d.pickingEnd = true; }
       render();
     },
-    ongoing: function () { var d = ui.draft; d.ongoing = !d.ongoing; if (d.ongoing) { d.end = null; } else { d.end = d.start; } d.pickingEnd = false; render(); },
+    toggleCal: function () { ui.draft.showCal = !ui.draft.showCal; render(); },
     saveEntry: function () {
       var d = ui.draft, issue = issueById(d.issueId);
       var e = { id: uid(), issueId: issue.id, start: d.start, end: d.ongoing ? null : (d.end || d.start), level: levelFor(issue, d), note: (d.note || '').trim() };
@@ -1103,7 +1259,7 @@ impGo: function () {
 
   document.addEventListener('click', function (ev) {
     var el = ev.target.closest('[data-act]');
-    if (el && actions[el.getAttribute('data-act')]) actions[el.getAttribute('data-act')](el);
+    if (el && actions[el.getAttribute('data-act')]) actions[el.getAttribute('data-act')](el, ev);
   });
   document.addEventListener('input', function (ev) {
     if (ev.target.getAttribute && ev.target.getAttribute('data-range') === 'strength' && ui.draft) {
