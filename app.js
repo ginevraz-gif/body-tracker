@@ -48,30 +48,35 @@
   function defaultIssues() {
     return [
       { id: 'period', name: 'My period started today', sub: 'Tap once to mark today as day 1', kind: 'period', icon: 'drop', tile: 'tile-pink', pinned: true },
-      { id: 'poop', name: 'Poo tracker', sub: 'Bristol scale, or note that you didn’t poo', kind: 'poop', icon: 'poop', tile: 'tile-orange', pinned: true },
-      { id: 'back', name: 'Back pain', kind: 'pain', icon: 'spine', tile: 'tile-yellow', where: ['Lower back', 'Mid back', 'Upper back', 'Left side', 'Right side', 'Hips'] }
+      { id: 'poop', name: 'Poo tracker', sub: 'Bristol scale, or note that you didn’t poo', kind: 'poop', icon: 'poop', tile: 'tile-orange', pinned: true }
     ];
   }
   /* Ready-made issues offered under "Add an issue". */
   var PRESETS = [
-    { id: 'headache', name: 'Headache', kind: 'pain', icon: 'headache', tile: 'tile-yellow', where: ['Forehead', 'Temples', 'Back of head', 'One side', 'Behind the eyes'] },
-    { id: 'neck', name: 'Neck pain', kind: 'pain', icon: 'neck', tile: 'tile-yellow', where: ['Back of neck', 'Left side', 'Right side', 'Shoulders'] },
+    { id: 'back', name: 'Lower back pain', kind: 'pain', icon: 'spine', tile: 'tile-yellow', where: ['Left', 'Right'] },
+    { id: 'headache', name: 'Headache', kind: 'pain', icon: 'headache', tile: 'tile-yellow' },
+    { id: 'neck', name: 'Neck pain', kind: 'pain', icon: 'neck', tile: 'tile-yellow' },
     { id: 'cramps', name: 'Period cramps', kind: 'pain', icon: 'uterus', tile: 'tile-pink', where: ['Lower belly', 'Left side', 'Right side', 'Lower back'] },
     { id: 'breast', name: 'Breast tenderness', kind: 'pain', icon: 'breast', tile: 'tile-pink', where: ['Left', 'Right', 'Both'] },
     { id: 'gut', name: 'Gut pain', sub: 'Bloating, stomach burning, nausea', kind: 'gut', icon: 'gut', tile: 'tile-lilac', symptoms: ['Bloating', 'Stomach burning', 'Nausea'] },
-    { id: 'cystitis', name: 'Cystitis', kind: 'pain', icon: 'bladder', tile: 'tile-blue' }
+    { id: 'cystitis', name: 'Cystitis', kind: 'pain', icon: 'bladder', tile: 'tile-lilac' },
+    { id: 'seizure', name: 'Epileptic seizure', kind: 'seizure', icon: 'pulse', tile: 'tile-green', whereLabel: 'Type', where: ['Total', 'Partial'] },
+    { id: 'tiredness', name: 'Tiredness', kind: 'custom', icon: 'moon', tile: 'tile-blue' },
+    { id: 'irritability', name: 'Irritability', kind: 'custom', icon: 'bolt', tile: 'tile-blue' }
   ];
   function defaultDb() {
-    return { settings: { cycleLength: 28, periodLength: 5, birthControl: 'none' }, periodStarts: [], issues: defaultIssues(), entries: [] };
+    return { settings: { cycleLength: 28, periodLength: 5, birthControl: 'none' }, periodStarts: [], periodFlow: {}, periodEnds: [], issues: defaultIssues().concat(PRESETS.map(function (c) { var x = JSON.parse(JSON.stringify(c)); x.hidden = true; return x; })), entries: [] };
   }
   function load() {
     try {
       var s = JSON.parse(localStorage.getItem(KEY));
       if (s && s.settings && s.issues && s.entries && s.periodStarts) {
+        if (!s.periodFlow) s.periodFlow = {};
+        if (!s.periodEnds) s.periodEnds = [];
         // Keep names and subtitles of built-in issues current.
         var canon = defaultIssues().concat(PRESETS);
         s.issues.forEach(function (i) {
-          canon.forEach(function (c) { if (c.id === i.id) { i.name = c.name; i.sub = c.sub; i.kind = c.kind; i.pinned = !!c.pinned; if (c.icon) { i.icon = c.icon; i.tile = c.tile; } } });
+          canon.forEach(function (c) { if (c.id === i.id) { i.name = c.name; i.sub = c.sub; i.where = c.where ? c.where.slice() : undefined; i.whereLabel = c.whereLabel; i.kind = c.kind; i.pinned = !!c.pinned; if (c.icon) { i.icon = c.icon; i.tile = c.tile; } } });
         });
         // Older entries used a 1-5 strength; convert to the 0-10 scale.
         s.entries.forEach(function (e) { if (typeof e.strength === 'number' && e.scale !== 10) { e.strength = e.strength * 2; e.scale = 10; } });
@@ -80,9 +85,10 @@
           if (!s.issues.some(function (i) { return i.id === c.id; })) s.issues.unshift(c);
         });
         // Pre-create the library so every common pain is always in the log list.
-        PRESETS.forEach(function (c) { if (!s.issues.some(function (i) { return i.id === c.id; })) s.issues.push(JSON.parse(JSON.stringify(c))); });
-        var rank = function (i) { var p = ['period', 'poop'].indexOf(i.id); if (i.pinned) return p === -1 ? 2 : p; var o = ['back', 'headache', 'neck', 'cramps', 'breast', 'gut', 'cystitis'].indexOf(i.id); return o === -1 ? 100 : 3 + o; };
-        s.issues.sort(function (a, b) { return rank(a) - rank(b); });
+        s.issues.forEach(function (i) { if (i.hidden === undefined) i.hidden = false; });
+        PRESETS.forEach(function (c) { if (!s.issues.some(function (i) { return i.id === c.id; })) { var x = JSON.parse(JSON.stringify(c)); x.hidden = true; s.issues.push(x); } });
+        var rank = function (i) { var p = ['period', 'poop'].indexOf(i.id); if (i.pinned) return p === -1 ? 2 : p; var o = ['back', 'headache', 'neck', 'cramps', 'breast', 'gut', 'cystitis', 'seizure', 'tiredness', 'irritability'].indexOf(i.id); return o === -1 ? 100 : 3 + o; };
+        s.issues.sort(function (a, b) { return s.customOrder && !a.pinned && !b.pinned ? 0 : rank(a) - rank(b); });
         return s;
       }
     } catch (e) { /* ignore */ }
@@ -107,9 +113,13 @@
     info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5.500M12 7.800h.01"/>',
     back: '<path d="M15 5l-7 7 7 7"/>',
     chevR: '<path d="M9 5l7 7-7 7"/>',
+    minus: '<circle cx="12" cy="12" r="9"/><path d="M8 12h8"/>',
+    grip: '<g fill="currentColor" stroke="none"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></g>',
     leaf: '<path d="M5 19c0-9 5-14 14-14 0 9-5 14-14 14zM5 19l8-8"/>',
     target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/>',
     trend: '<path d="M3 17l6-6 4 4 8-8"/>',
+    pencil: '<path d="M4 20h4L19 9l-4-4L4 16z M13.500 6.500l4 4"/>',
+    list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
     x: '<path d="M6 6l12 12M18 6L6 18"/>',
     head: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/>',
     eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
@@ -288,7 +298,7 @@
   function go(view, extra) {
     if (view === 'settings') ui.bcOpen = false;
     if (view === 'eat') ui.eatMore = false;
-    if (view !== ui.view) ui.dayPick = null;
+    if (view !== ui.view) { ui.dayPick = null; ui.reorder = false; }
     ui.view = view;
     if (extra) for (var k in extra) ui[k] = extra[k];
     render();
@@ -313,7 +323,7 @@
     return '<nav class="nav" aria-label="' + tr('Main') + '">' +
       tab('today', 'target', 'Today') + tab('eat', 'leaf', 'Eat') +
       '<button class="fab" data-act="go" data-v="log" aria-label="' + tr('Log something') + '">' + icon('plus') + '</button>' +
-      tab('patterns', 'trend', 'Patterns') + tab('settings', 'sliders', 'Settings') +
+      tab('history', 'list', 'History') + tab('settings', 'sliders', 'Settings') +
       '</nav>';
   }
 
@@ -482,6 +492,51 @@
   document.addEventListener('pointerup', endScrub);
   document.addEventListener('pointercancel', endScrub);
   document.addEventListener('click', function (ev) { if (suppressClick) { ev.stopPropagation(); ev.preventDefault(); } }, true);
+
+  /* ---------- Drag to reorder issues ---------- */
+  var drag = null;
+  function saveOrder() {
+    var list = document.getElementById('sortList'); if (!list) return;
+    var ids = [].map.call(list.querySelectorAll('.sortable'), function (r) { return r.getAttribute('data-id'); });
+    var moved = ids.map(function (id) { return issueById(id) || JSON.parse(JSON.stringify(PRESETS.filter(function (p) { return p.id === id; })[0] || null)); }).filter(Boolean);
+    var rest = db.issues.filter(function (i) { return ids.indexOf(i.id) === -1; });
+    db.issues = rest.concat(moved); db.customOrder = true; save();
+  }
+  function moveRow(row, y) {
+    var sibs = [].filter.call(row.parentNode.querySelectorAll('.sortable'), function (r) { return r !== row; });
+    var before = null;
+    for (var k = 0; k < sibs.length; k++) { var b = sibs[k].getBoundingClientRect(); if (y < b.top + b.height / 2) { before = sibs[k]; break; } }
+    row.parentNode.insertBefore(row, before);
+  }
+  document.addEventListener('pointerdown', function (ev) {
+    var g = ev.target.closest && ev.target.closest('[data-grip]');
+    if (!g) return;
+    var row = g.closest('.sortable'); if (!row) return;
+    ev.preventDefault();
+    drag = { row: row, grip: g, id: ev.pointerId };
+    row.classList.add('dragging');
+    try { g.setPointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
+  });
+  document.addEventListener('pointermove', function (ev) {
+    if (!drag || ev.pointerId !== drag.id) return;
+    moveRow(drag.row, ev.clientY);
+    if (ev.clientY < 70) window.scrollBy(0, -12); else if (ev.clientY > window.innerHeight - 70) window.scrollBy(0, 12);
+  });
+  function endDrag(ev) {
+    if (!drag || (ev && ev.pointerId !== drag.id)) return;
+    drag.row.classList.remove('dragging'); drag = null; saveOrder();
+  }
+  document.addEventListener('pointerup', endDrag);
+  document.addEventListener('pointercancel', endDrag);
+  document.addEventListener('keydown', function (ev) {
+    var g = ev.target.closest && ev.target.closest('[data-grip]');
+    if (!g || (ev.key !== 'ArrowUp' && ev.key !== 'ArrowDown')) return;
+    ev.preventDefault();
+    var row = g.closest('.sortable'), other = ev.key === 'ArrowUp' ? row.previousElementSibling : row.nextElementSibling;
+    if (!other) return;
+    if (ev.key === 'ArrowUp') row.parentNode.insertBefore(row, other); else row.parentNode.insertBefore(other, row);
+    g.focus(); saveOrder();
+  });
   function dayDetails(info, d) {
     var cl = info.cl, od = cl - 14, ph = PHASES[phaseOfDay(d)], date = addDays(info.start, d - 1), n = diffDays(date, todayIso());
     var when = shortDate(date) + (n === 0 ? ' · ' + tr('today') : n === 1 ? ' · ' + tr('tomorrow') : n === -1 ? ' · ' + tr('yesterday') : n > 0 ? ' · ' + tr('in {n} days', { n: n }) : ' · ' + tr('{n} days ago', { n: -n }));
@@ -498,7 +553,7 @@
     var info = cycleInfo(todayIso());
     var h = '<div class="banner"><div><small>' + esc(longToday()) + '</small><h1>' + tr('Today') + '</h1></div></div>';
     if (!info) {
-      return h + '<div class="card setup"><h2>' + tr('When did your last period start?') + '</h2><p>' + tr('Add the first day and I will work out where you are in your cycle. You can change it any time.') + '</p>' +
+      return h + '<div class="card setup">' + langPicker('margin-top:0') + '<h2 style="margin-top:20px">' + tr('When did your last period start?') + '</h2><p>' + tr('Add the first day and I will work out where you are in your cycle. You can change it any time.') + '</p>' +
         '<input type="date" id="firstStart" max="' + todayIso() + '" value="' + todayIso() + '">' +
         '<button class="btn" data-act="firstStart">' + tr('Save') + '</button></div>' +
         '<p class="quiet">' + tr('Your data stays on this device.') + '</p>' + navBar('today');
@@ -523,19 +578,20 @@
   function viewLog() {
     function row(i) {
       var sub = (i.pinned && i.sub) ? tr(i.sub) : lastLoggedText(i.id);
+      if (ui.reorder && !i.pinned) return '<div class="big-row sortable" data-id="' + esc(i.id) + '"><span class="icon-tile ' + i.tile + '">' + icon(i.icon) + '</span><span><span class="t">' + esc(iname(i)) + '</span></span><button class="hide-btn" data-act="hide" data-id="' + esc(i.id) + '" aria-label="' + esc(tr('Hide from my list') + ': ' + iname(i)) + '">' + icon('minus') + '</button><button class="grip" data-grip="1" aria-label="' + esc(tr('Drag to reorder') + ': ' + iname(i)) + '">' + icon('grip') + '</button></div>';
       return '<button class="big-row" data-act="pick" data-id="' + esc(i.id) + '"' + (i.preset ? ' data-preset="1"' : '') + '><span class="icon-tile ' + i.tile + '">' + icon(i.icon) + '</span><span><span class="t">' + esc(iname(i)) + '</span><span class="s">' + esc(sub) + '</span></span>' +
         (i.kind === 'period' || i.kind === 'tap' ? '' : '<span class="chev">' + icon('chevR') + '</span>') + '</button>';
     }
     var pinned = db.issues.filter(function (i) { return i.pinned; });
-    var yours = db.issues.filter(function (i) { return !i.pinned; });
-    // Ready-made issues are always listed, so there is no need to "add" them first.
-    PRESETS.forEach(function (p) { if (!issueById(p.id)) yours.push(Object.assign({ preset: true }, p)); });
+    var yours = db.issues.filter(function (i) { return !i.pinned && !i.hidden; });
     var h = banner('Log', 'What’s worth noting?', 'today') +
-      '<p class="sub" style="margin-top:8px">' + tr('Everything here is optional. Only log what you want to remember.') + '</p>' +
-      '<div class="section-h" style="color:var(--muted);font-weight:500">' + tr('Pinned') + '</div>' + pinned.map(row).join('');
-    h += '<div class="section-h" style="color:var(--muted);font-weight:500">' + tr('Your issues') + '</div>' + yours.map(row).join('');
-    h += '<button class="dashed" data-act="addIssue">' + icon('plus') + ' ' + tr('Something else? Add a new issue') + '</button>';
-    h += '<p class="quiet">' + tr('No streaks, no reminders. Nothing is ever overdue.') + '</p>';
+      '<div class="section-h" style="color:var(--muted);font-weight:500">' + tr('Pinned') + '</div>' + pinned.map(function (i) { return i.kind === 'period' && activePeriodStart() ? flowCard() : row(i); }).join('');
+    if (!yours.length) ui.reorder = false;
+    h += '<div class="section-h section-row" style="color:var(--muted);font-weight:500"><span>' + tr('Your issues') + '</span>' + (yours.length ? '<button class="link-btn" data-act="reorder">' + (ui.reorder ? tr('Done') : tr('Edit')) + '</button>' : '') + '</div>';
+    if (ui.reorder) h += '<p class="sub" style="margin:0 0 8px">' + tr('Drag the handles to reorder, or tap the minus to take an issue off your list.') + '</p>';
+    if (!yours.length) h += '<p class="sub" style="margin:0 0 8px">' + tr('Nothing here yet. Tap Add to choose what you want to keep track of.') + '</p>';
+    h += '<div id="sortList">' + yours.map(row).join('') + '</div>';
+    h += '<button class="dashed" data-act="addPick">' + icon('plus') + ' ' + tr('Add an issue') + '</button>';
     return h;
   }
 
@@ -589,6 +645,8 @@
   }
   function insightText(issue) {
     var cl = db.settings.cycleLength, since = addDays(todayIso(), -cl * 3);
+    // Only speak of patterns once there is more than one cycle of data.
+    if (diffDays(todayIso(), firstDataDate() || todayIso()) < cl) return '';
     var list = db.entries.filter(function (e) { return e.issueId === issue.id && e.start >= since; });
     if (!list.length) return '';
     var cycles = Math.max(1, Math.min(3, Math.ceil(diffDays(todayIso(), firstDataDate() || todayIso()) / cl) || 1));
@@ -612,19 +670,17 @@
     var l = list[0], last = l.end || todayIso(), n = diffDays(todayIso(), last);
     var ago = n <= 0 ? tr('Today') : n === 1 ? tr('Yesterday') : tr('{n} days ago', { n: n });
     var head = (n <= 0 && !l.end) ? tr('Still going since {d}', { d: shortDate(l.start) }) : tr('Last time: {ago}', { ago: ago.toLowerCase() });
-    var rows = list.slice(0, 5).map(function (e) {
+    var rows = list.slice(0, 3).map(function (e) {
       var dt = e.end && e.end !== e.start ? tr('{a} to {b}', { a: shortDate(e.start), b: shortDate(e.end) }) : shortDate(e.start);
       return '<li><span>' + esc(dt) + '</span><em>' + esc(describeEntry(e).detail || '—') + '</em></li>';
     }).join('');
-    return '<div class="last-card"><b>' + esc(head) + '</b><span>' + tn('{n} time logged in total', '{n} times logged in total', list.length) + '</span><ul>' + rows + '</ul></div>';
+    return '<div class="last-card"><b>' + esc(head) + '</b><ul>' + rows + '</ul><button class="link-btn last-all" data-act="history">' + tr('View all') + '</button></div>';
   }
   function viewIssue() {
     var d = ui.draft, issue = issueById(d.issueId);
-    var ci = cycleInfo(todayIso());
-    var h = banner('Log', iname(issue), 'log') +
-      '<p class="sub">' + (ci ? tr('Cycle day {n} is added for you.', { n: ci.rawDay }) : tr('Add a few details if you like.')) + '</p>';
-    h += insightText(issue);
-    if (issue.kind !== 'poop' && issue.kind !== 'period') h += historyCard(issue);
+    var h = d.editId ? banner('Edit', iname(issue), 'history') : banner('Log', iname(issue), 'log');
+    if (!d.editId) h += insightText(issue);
+    if (!d.editId && issue.kind !== 'period') h += historyCard(issue);
 
     if (issue.kind === 'poop') {
       h += '<button class="btn-outline warn ' + (d.noPoo ? 'on' : '') + '" style="margin-top:18px" data-act="noPoo">' + (d.noPoo ? '✓ ' : '') + tr('I didn’t poo') + '</button>';
@@ -634,17 +690,17 @@
       h += BRISTOL.map(function (b) { return '<button class="bristol t-' + ({ 1: 'red', 2: 'yellow', 3: 'green', 4: 'green', 5: 'yellow', 6: 'red', 7: 'red' }[b[0]]) + ' ' + (d.bristol === b[0] ? 'on' : '') + '" data-act="bristol" data-n="' + b[0] + '"><span class="art">' + bristolArt(b[0]) + '</span><span><span class="n">' + tr(b[1]) + '</span><span class="d">' + tr(b[2]) + '</span></span></button>'; }).join('');
     }
     if (issue.where && issue.where.length) {
-      h += '<div class="label">' + tr('Where') + '</div><div class="opts">' + issue.where.map(function (w) { return '<button class="opt ' + (d.where === w ? 'on' : '') + '" data-act="where" data-w="' + esc(w) + '">' + esc(tr(w)) + '</button>'; }).join('') + '</div>';
+      h += '<div class="label">' + tr(issue.whereLabel || 'Where') + '</div><div class="opts">' + issue.where.map(function (w) { return '<button class="opt ' + (d.where === w ? 'on' : '') + '" data-act="where" data-w="' + esc(w) + '">' + esc(tr(w)) + '</button>'; }).join('') + '</div>';
     }
     if (issue.symptoms && issue.symptoms.length) {
       h += '<div class="label">' + tr('What are you feeling? Pick any') + '</div><div class="opts">' + issue.symptoms.map(function (s) { return '<button class="opt ' + (d.symptoms.indexOf(s) !== -1 ? 'on' : '') + '" data-act="symptom" data-s="' + esc(s) + '">' + esc(tr(s)) + '</button>'; }).join('') + '</div>';
     }
-    if (issue.kind === 'pain' || issue.kind === 'custom' || issue.kind === 'gut') {
+    if (issue.kind === 'pain' || issue.kind === 'custom' || issue.kind === 'gut' || issue.kind === 'seizure') {
       var word = strengthWord(d.strength);
-      h += '<div class="strong-label"><span>' + (issue.kind === 'pain' ? tr('How bad is the pain') : tr('How strong')) + '</span><b id="strengthLabel">' + word + '</b></div>';
+      h += '<div class="strong-label"><span>' + (issue.kind === 'pain' ? tr('How bad is the pain') : issue.kind === 'seizure' ? tr('How severe') : tr('How strong')) + '</span><b id="strengthLabel">' + word + '</b></div>';
       h += '<div class="slider-wrap"><div class="bubble" id="bubble" style="--v:' + d.strength + '">' + d.strength + '</div>' +
         '<input type="range" class="slider" min="0" max="10" step="1" value="' + d.strength + '" data-range="strength" aria-label="' + tr('Strength from 0 to 10') + '"></div>';
-      h += '<div class="scale-cap"><span>' + (issue.kind === 'pain' ? tr('No pain') : tr('None')) + '</span><span>' + tr('Worst ever') + '</span></div>';
+      h += '<div class="scale-cap"><span>' + (issue.kind === 'pain' ? tr('No pain') : issue.kind === 'seizure' ? tr('Mild') : tr('None')) + '</span><span>' + tr('Worst ever') + '</span></div>';
     }
     if (issue.kind === 'bloat') {
       h += '<div class="label">' + tr('How bloated') + '</div><div class="scale scale3">' + [[1, 'Mild'], [2, 'Noticeable'], [3, 'Heavy']].map(function (o) { return '<button class="opt ' + (d.bloat === o[0] ? 'on' : '') + '" data-act="bloat" data-n="' + o[0] + '">' + tr(o[1]) + '</button>'; }).join('') + '</div>';
@@ -652,11 +708,25 @@
     h += '<div class="label" style="margin-bottom:4px">' + tr('When') + '</div><div class="when-row"><div class="when">' + esc(whenText(d)) + '</div>' +
       '<button class="link-btn" data-act="toggleCal">' + (d.showCal ? tr('Done') : tr('Change date or range')) + '</button></div>';
     if (d.showCal) h += '<p class="sub" style="margin:2px 0 0">' + tr('Tap a day. Tap a later day to make it a range.') + '</p>' + calendarHtml(d);
+    if (issue.kind === 'seizure') {
+      h += '<div class="label">' + tr('Start time') + '</div><input type="time" data-input="time" value="' + esc(d.time || '') + '">';
+      h += '<div class="label">' + tr('Duration') + '</div><div class="dur-row">' +
+        '<label><input type="number" inputmode="numeric" min="0" max="999" data-input="durMin" placeholder="0" value="' + esc(d.durMin || '') + '"><span>' + tr('Minutes') + '</span></label></div>';
+    }
     h += '<div class="label">' + tr('Note for yourself') + '</div><textarea data-input="note" placeholder="' + esc(tr('What you ate, stress, travel, anything')) + '">' + esc(d.note) + '</textarea>';
     h += '<button class="btn" data-act="saveEntry">' + tr('Save') + '</button>';
     return h;
   }
 
+  function viewAddPick() {
+    var avail = db.issues.filter(function (i) { return !i.pinned && i.hidden; });
+    var h = banner('Log', 'Add an issue', 'log') +
+      '<p class="sub">' + tr('Choose what you want to keep track of. You can take any of them off your list again with Edit.') + '</p>';
+    if (!avail.length) return h + '<div class="card empty"><p>' + tr('Everything is already on your list.') + '</p></div>';
+    return h + avail.map(function (i) {
+      return '<button class="big-row" data-act="unhide" data-id="' + esc(i.id) + '"><span class="icon-tile ' + i.tile + '">' + icon(i.icon) + '</span><span><span class="t">' + esc(iname(i)) + '</span>' + (i.sub ? '<span class="s">' + esc(tr(i.sub)) + '</span>' : '') + '</span><span class="chev">' + icon('plus') + '</span></button>';
+    }).join('');
+  }
   function viewAddIssue() {
     var d = ui.draft;
     var tiles = ISSUE_TILES;
@@ -687,12 +757,15 @@
     ['Valerie Ribon', 'Your Cycle Gives You Superpowers (A Guide)', 'https://valerieribon.substack.com/p/your-cycle-gives-you-superpowers'],
     ['Sophie Trotman', '10 Things I Wish Women Knew About Their Menstrual Cycle', 'https://sophietrotmannutrition.substack.com/p/10-things-i-wish-women-knew-about']
   ];
+  function langPicker(style) {
+    return '<div class="label" style="' + (style || '') + '">' + tr('Language and seasonal produce') + '</div><div class="lang-row">' +
+      '<button class="opt ' + (lang === 'en' ? 'on' : '') + '" data-act="setLang" data-l="en" aria-label="English, Dutch seasonal produce" aria-pressed="' + (lang === 'en') + '">EN / NL</button>' +
+      '<button class="opt ' + (lang === 'it' ? 'on' : '') + '" data-act="setLang" data-l="it" aria-label="Italiano, prodotti di stagione italiani" aria-pressed="' + (lang === 'it') + '">IT / IT</button></div>';
+  }
   function viewSettings() {
     var s = db.settings, cur = BC.filter(function (b) { return b[0] === s.birthControl; })[0] || BC[0];
     var h = banner('Your cycle and data', 'Settings') +
-      '<div class="label" style="margin-top:14px">' + tr('Language and seasonal produce') + '</div><div class="lang-row">' +
-      '<button class="opt ' + (lang === 'en' ? 'on' : '') + '" data-act="setLang" data-l="en" aria-label="English, Dutch seasonal produce" aria-pressed="' + (lang === 'en') + '">EN / NL</button>' +
-      '<button class="opt ' + (lang === 'it' ? 'on' : '') + '" data-act="setLang" data-l="it" aria-label="Italiano, prodotti di stagione italiani" aria-pressed="' + (lang === 'it') + '">IT / IT</button></div>' +
+      langPicker('margin-top:14px') +
       '<div class="label">' + tr('Your cycle') + '</div><div class="stepper-card">' +
       '<div class="stepper"><span>' + tr('Cycle length') + '</span><span class="ctl"><button data-act="step" data-k="cycleLength" data-n="-1" aria-label="' + tr('Shorter') + '">−</button><span>' + tr('{n} days', { n: s.cycleLength }) + '</span><button data-act="step" data-k="cycleLength" data-n="1" aria-label="' + tr('Longer') + '">+</button></span></div>' +
       '<div class="stepper"><span>' + tr('Period length') + '</span><span class="ctl"><button data-act="step" data-k="periodLength" data-n="-1" aria-label="' + tr('Shorter') + '">−</button><span>' + tr('{n} days', { n: s.periodLength }) + '</span><button data-act="step" data-k="periodLength" data-n="1" aria-label="' + tr('Longer') + '">+</button></span></div></div>';
@@ -707,7 +780,8 @@
       '<button class="btn secondary" data-act="importNotes">' + tr('Import data') + '</button>' +
       '<button class="btn secondary" data-act="export">' + tr('Download backup') + '</button>' +
       '<button class="btn danger" data-act="wipe">' + tr('Delete all my data') + '</button>';
-    h += '<div class="label">' + tr('Sources') + '</div><p class="sub">' + tr('Personal perspectives, not medical advice. The tips in the app are my own summaries of:') + '</p><ul class="know" style="margin-bottom:16px">' + SOURCES.map(function (r) { return '<li><a href="' + r[2] + '" target="_blank" rel="noopener">' + esc(r[1]) + '</a> (' + esc(r[0]) + ')</li>'; }).join('') + '</ul>';
+    // Sources list hidden for now (SOURCES array kept above to restore later).
+    /* h += '<div class="label">' + tr('Sources') + '</div><p class="sub">' + tr('Personal perspectives, not medical advice. The tips in the app are my own summaries of:') + '</p><ul class="know" style="margin-bottom:16px">' + SOURCES.map(function (r) { return '<li><a href="' + r[2] + '" target="_blank" rel="noopener">' + esc(r[1]) + '</a> (' + esc(r[0]) + ')</li>'; }).join('') + '</ul>'; */
     return h + navBar('settings');
   }
 
@@ -806,30 +880,57 @@
     var iss = issueById(e.issueId), bits = [];
     if (e.symptoms && e.symptoms.length) bits.push(e.symptoms.map(function (z) { return tr(z); }).join(', '));
     if (e.where) bits.push(tr(e.where));
+    if (e.time) bits.push(e.time);
+    if (e.durationSec) bits.push(Math.floor(e.durationSec / 60) ? Math.floor(e.durationSec / 60) + ' min' + (e.durationSec % 60 ? ' ' + e.durationSec % 60 + ' s' : '') : e.durationSec + ' s');
     if (e.noPoo) bits.push(tr('Didn’t poo'));
     else if (e.bristol) bits.push(tr('Type {n}: {name}', { n: e.bristol, name: tr(BRISTOL[e.bristol - 1][1]) }));
     if (e.bloat) bits.push(tr(['', 'Mild', 'Noticeable', 'Heavy'][e.bloat]));
     if (typeof e.strength === 'number') bits.push(e.strength + '/10');
     return { title: iss ? iname(iss) : tr('Deleted issue'), detail: bits.join(' · ') };
   }
+  function viewEditPeriod() {
+    var dr = ui.draft || {};
+    if (dr.kind === 'flow' || dr.kind === 'end') {
+      var hh = banner('Edit', dr.kind === 'flow' ? 'Period flow' : 'Period ended', 'history');
+      if (dr.kind === 'flow') hh += '<div class="label">' + tr('How strong was it?') + '</div><div class="scale scale3">' + FLOW.map(function (f, i) { return '<button class="opt ' + (dr.n === i + 1 ? 'on' : '') + '" data-act="flowPick" data-n="' + (i + 1) + '">' + tr(f) + '</button>'; }).join('') + '</div>';
+      return hh + '<div class="label">' + tr('Date') + '</div><input type="date" id="periodDate" max="' + todayIso() + '" value="' + esc(dr.date || '') + '">' +
+        '<button class="btn" data-act="' + (dr.kind === 'flow' ? 'saveFlowEdit' : 'saveEndEdit') + '">' + tr('Save') + '</button>';
+    }
+    var old = ui.draft && ui.draft.editPeriod;
+    return banner('Edit', 'Period started', 'history') +
+      '<div class="label">' + tr('Date') + '</div><input type="date" id="periodDate" max="' + todayIso() + '" value="' + esc(old || '') + '">' +
+      '<button class="btn" data-act="savePeriod">' + tr('Save') + '</button>';
+  }
   function viewHistory() {
     var rows = [];
     db.entries.forEach(function (e) { rows.push({ type: 'entry', date: e.start, e: e }); });
     db.periodStarts.forEach(function (s) { rows.push({ type: 'period', date: s }); });
+    Object.keys(db.periodFlow).forEach(function (d) { rows.push({ type: 'flow', date: d }); });
+    db.periodEnds.forEach(function (d) { rows.push({ type: 'periodEnd', date: d }); });
     rows.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
-    var h = banner('Everything you logged', 'All entries', ui.histFrom) +
-      '<p class="sub">' + tr('Newest first. Tap the bin to delete something you logged by mistake. You can undo straight after.') + '</p>';
-    if (!rows.length) return h + '<div class="card empty"><p>' + tr('Nothing logged yet.') + '</p></div>';
+    var h = banner('Everything you logged', 'History');
+    if (!rows.length) return h + '<div class="card empty"><p>' + tr('Nothing logged yet.') + '</p></div>' + navBar('history');
+    function dayHead(ds) {
+      var d = parse(ds), n = diffDays(todayIso(), ds);
+      var full = cap(WEEKDAYS[d.getDay()]) + ' ' + d.getDate() + ' ' + MONTHS[d.getMonth()] + (ds.slice(0, 4) !== todayIso().slice(0, 4) ? ' ' + d.getFullYear() : '');
+      return '<h2 class="hist-day">' + (n === 0 || n === 1 ? '<b>' + esc(dayWord(ds)) + '</b><span>' + esc(full) + '</span>' : '<b>' + esc(full) + '</b>') + '</h2>';
+    }
+    var lastDay = null;
     return h + rows.map(function (r) {
-      var title, detail, when, note = '', key;
-      if (r.type === 'period') { title = tr('Period started'); detail = ''; when = shortDate(r.date); key = 'data-act="delPeriod" data-d="' + r.date + '"'; }
+      var title, detail, when, note = '', key, edit, head = '';
+      if (r.date !== lastDay) { head = dayHead(r.date); lastDay = r.date; }
+      if (r.type === 'period') { title = tr('Period started'); detail = ''; when = shortDate(r.date); key = 'data-act="delPeriod" data-d="' + r.date + '"'; edit = 'data-act="editPeriod" data-d="' + r.date + '"'; }
+      else if (r.type === 'flow') { title = tr('Period flow'); detail = tr(FLOW[db.periodFlow[r.date] - 1] || 'Medium'); when = shortDate(r.date); key = 'data-act="delFlow" data-d="' + r.date + '"'; edit = 'data-act="editFlow" data-d="' + r.date + '"'; }
+      else if (r.type === 'periodEnd') { title = tr('Period ended'); detail = ''; when = shortDate(r.date); key = 'data-act="delEnd" data-d="' + r.date + '"'; edit = 'data-act="editEnd" data-d="' + r.date + '"'; }
       else {
         var d = describeEntry(r.e); title = d.title; detail = d.detail; note = r.e.note || '';
-        when = whenText({ start: r.e.start, end: r.e.end, ongoing: !r.e.end }); key = 'data-act="delEntry" data-id="' + r.e.id + '"';
+        when = whenText({ start: r.e.start, end: r.e.end, ongoing: !r.e.end }); key = 'data-act="delEntry" data-id="' + r.e.id + '"'; edit = 'data-act="editEntry" data-id="' + r.e.id + '"';
       }
-      return '<div class="hist"><div class="hist-main"><b>' + esc(title) + '</b><small>' + esc(when + (detail ? ' · ' + detail : '')) + '</small>' + (note ? '<em>' + esc(note) + '</em>' : '') + '</div>' +
+      var multi = r.type === 'entry' && (!r.e.end || r.e.end !== r.e.start), sub = (multi ? when : '') + (multi && detail ? ' · ' : '') + detail;
+      return head + '<div class="hist"><div class="hist-main"><b>' + esc(title) + '</b>' + (sub ? '<small>' + esc(sub) + '</small>' : '') + (note ? '<em>' + esc(note) + '</em>' : '') + '</div>' +
+        '<button class="hist-edit" ' + edit + ' aria-label="' + esc(tr('Edit {title} from {when}', { title: title, when: when })) + '">' + icon('pencil') + '</button>' +
         '<button class="hist-del" ' + key + ' aria-label="' + esc(tr('Delete {title} from {when}', { title: title, when: when })) + '">' + icon('trash') + '</button></div>';
-    }).join('');
+    }).join('') + navBar('history');
   }
 
   /* ---------- Eat: seasonal produce (grown in the Netherlands) ---------- */
@@ -1063,6 +1164,7 @@ function viewLearn() {
         if (!created[k]) { var t = ISSUE_TILES[0], ni = { id: uid(), name: r.name, kind: 'custom', icon: t[0], tile: t[1] }; db.issues.push(ni); addedI.push(ni.id); created[k] = ni.id; }
         issueId = created[k];
       }
+      var impIss = issueById(issueId); if (impIss && impIss.hidden) impIss.hidden = false;
       var issue = issueById(issueId);
       var draft = { strength: r.strength, bristol: r.bristol, noPoo: r.noPoo, bloat: r.strength <= 3 ? 1 : r.strength <= 6 ? 2 : 3 };
       var e = { id: uid(), issueId: issueId, start: r.date, end: r.date, level: levelFor(issue, draft), note: r.note || '' };
@@ -1126,10 +1228,12 @@ function viewLearn() {
     else if (v === 'importNotes') html = viewImportNotes();
     else if (v === 'log') html = viewLog();
     else if (v === 'issue') html = viewIssue();
+    else if (v === 'addPick') html = viewAddPick();
     else if (v === 'addIssue') html = viewAddIssue();
     else if (v === 'history') html = viewHistory();
+    else if (v === 'editPeriod') html = viewEditPeriod();
     else html = viewSettings();
-    app.className = (v === 'today' ? 'today ' : '') + ((v === 'today' || v === 'patterns' || v === 'eat' || v === 'learn' || v === 'hormones' || v === 'settings') ? '' : 'noNav');
+    app.className = (v === 'today' ? 'today ' : '') + ((v === 'today' || v === 'patterns' || v === 'history' || v === 'eat' || v === 'learn' || v === 'hormones' || v === 'settings') ? '' : 'noNav');
     app.innerHTML = html;
   }
 
@@ -1142,12 +1246,40 @@ function viewLearn() {
     } : null);
     return true;
   }
+  var FLOW = ['Light', 'Medium', 'Heavy'];
+  /* The start of a period that is still going: latest start, not yet ended, within the last 14 days. */
+  function activePeriodStart() {
+    var t = todayIso(), st = null;
+    db.periodStarts.forEach(function (x) { if (x <= t && (!st || x > st)) st = x; });
+    if (!st || diffDays(t, st) > 13) return null;
+    return db.periodEnds.some(function (e) { return e >= st; }) ? null : st;
+  }
+  function flowCard() {
+    var st = activePeriodStart(); if (!st) return '';
+    var t = todayIso(), cur = db.periodFlow[t] || 0;
+    return '<section class="card flow-card"><div class="flow-head"><span class="icon-tile flow-tile">' + icon('drop') + '</span><h2>' + tr('Period day {n}', { n: diffDays(t, st) + 1 }) + '</h2></div><p class="sub flow-q">' + tr('How strong is your flow today?') + '</p>' +
+      '<div class="scale scale3">' + FLOW.map(function (f, i) { return '<button class="opt ' + (cur === i + 1 ? 'on' : '') + '" data-act="setFlow" data-n="' + (i + 1) + '">' + tr(f) + '</button>'; }).join('') + '</div>' +
+      '<button class="btn flow-end" data-act="endPeriod">' + tr('My period is over') + '</button></section>';
+  }
   function newDraft(issue) {
     var t = todayIso();
-    return { issueId: issue.id, where: null, strength: 5, bloat: 2, bristol: 4, noPoo: false, symptoms: [], start: t, end: t, ongoing: false, note: '', calMonth: t.slice(0, 7) };
+    return { issueId: issue.id, where: null, strength: 5, bloat: 2, bristol: 4, noPoo: false, symptoms: [], time: '', durMin: '', start: t, end: t, ongoing: false, note: '', calMonth: t.slice(0, 7) };
   }
 
   var actions = {
+    reorder: function () { ui.reorder = !ui.reorder; render(); },
+    addPick: function () { go('addPick'); },
+    hide: function (el) {
+      var iss = issueById(el.getAttribute('data-id')); if (!iss) return;
+      iss.hidden = true; save(); render();
+      toast(tr('Taken off your list: {name}', { name: iname(iss) }), function () { iss.hidden = false; save(); render(); });
+    },
+    unhide: function (el) {
+      var iss = issueById(el.getAttribute('data-id')); if (!iss) return;
+      iss.hidden = false;
+      db.issues = db.issues.filter(function (x) { return x !== iss; }); db.issues.push(iss); db.customOrder = true; save(); render();
+      toast(tr('{name} added', { name: iname(iss) }), function () { iss.hidden = true; save(); render(); });
+    },
     copyPrompt: function () {
       var done = function () { toast(tr('Prompt copied. Paste it into an AI, then add your notes.')); };
       if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(AI_PROMPT).then(done, function () { window.prompt(tr('Copy this prompt:'), AI_PROMPT); });
@@ -1224,14 +1356,86 @@ impGo: function () {
       var e = { id: uid(), issueId: issue.id, start: d.start, end: d.ongoing ? null : (d.end || d.start), level: levelFor(issue, d), note: (d.note || '').trim() };
       if (d.where) e.where = d.where;
       if (issue.kind === 'gut' && !d.symptoms.length) { toast(tr('Pick at least one symptom.')); return; }
-      if (issue.kind === 'pain' || issue.kind === 'custom' || issue.kind === 'gut') { e.strength = d.strength; e.scale = 10; }
+      if (issue.kind === 'pain' || issue.kind === 'custom' || issue.kind === 'gut' || issue.kind === 'seizure') { e.strength = d.strength; e.scale = 10; }
+      if (issue.kind === 'seizure') {
+        if (d.time) e.time = d.time;
+        var secs = Math.max(0, Math.floor(+d.durMin || 0)) * 60;
+        if (secs > 0) e.durationSec = secs;
+      }
       if (issue.kind === 'gut') e.symptoms = d.symptoms.slice();
       if (issue.kind === 'bloat') e.bloat = d.bloat;
       if (issue.kind === 'poop') { if (d.noPoo) e.noPoo = true; else e.bristol = d.bristol; }
+      if (d.editId) {
+        var idx = -1; db.entries.forEach(function (x, i) { if (x.id === d.editId) idx = i; });
+        if (idx === -1) { go('history'); return; }
+        var old = db.entries[idx]; e.id = old.id; db.entries[idx] = e; save(); go('history');
+        toast(tr('Changes saved'), function () { var j = -1; db.entries.forEach(function (x, i) { if (x.id === e.id) j = i; }); if (j !== -1) db.entries[j] = old; save(); render(); });
+        return;
+      }
       db.entries.push(e); save(); go('today');
       toast(tr('{name} saved', { name: iname(issue) }), function () { db.entries = db.entries.filter(function (x) { return x.id !== e.id; }); save(); render(); });
     },
-    history: function (el) { go('history', { histFrom: el.getAttribute('data-from') || 'patterns' }); },
+    editEntry: function (el) {
+      var id = el.getAttribute('data-id'), e = db.entries.filter(function (x) { return x.id === id; })[0];
+      if (!e) return;
+      var iss = issueById(e.issueId); if (!iss) { toast(tr('Deleted issue')); return; }
+      var d = newDraft(iss);
+      d.editId = e.id; d.start = e.start; d.end = e.end || e.start; d.ongoing = !e.end; d.note = e.note || '';
+      d.calMonth = e.start.slice(0, 7);
+      if (e.where) d.where = e.where;
+      if (typeof e.strength === 'number') d.strength = e.strength;
+      if (e.bloat) d.bloat = e.bloat;
+      if (e.bristol) d.bristol = e.bristol;
+      if (e.noPoo) d.noPoo = true;
+      if (e.symptoms) d.symptoms = e.symptoms.slice();
+      if (e.time) d.time = e.time;
+      if (e.durationSec) d.durMin = String(Math.round(e.durationSec / 60));
+      ui.draft = d; go('issue');
+    },
+    setFlow: function (el) {
+      var t = todayIso(), n = +el.getAttribute('data-n'), old = db.periodFlow[t];
+      if (old === n) delete db.periodFlow[t]; else db.periodFlow[t] = n;
+      save(); render();
+      toast(db.periodFlow[t] ? tr('Flow logged: {f}', { f: tr(FLOW[n - 1]).toLowerCase() }) : tr('Flow removed'), function () { if (old) db.periodFlow[t] = old; else delete db.periodFlow[t]; save(); render(); });
+    },
+    endPeriod: function () {
+      var t = todayIso(); if (db.periodEnds.indexOf(t) === -1) db.periodEnds.push(t); db.periodEnds.sort(); save(); render();
+      toast(tr('Period marked as over'), function () { db.periodEnds = db.periodEnds.filter(function (x) { return x !== t; }); save(); render(); });
+    },
+    delFlow: function (el) {
+      var d = el.getAttribute('data-d'), old = db.periodFlow[d]; delete db.periodFlow[d]; save(); render();
+      toast(tr('Flow deleted'), function () { db.periodFlow[d] = old; save(); render(); });
+    },
+    delEnd: function (el) {
+      var d = el.getAttribute('data-d'); db.periodEnds = db.periodEnds.filter(function (x) { return x !== d; }); save(); render();
+      toast(tr('Period end deleted'), function () { db.periodEnds.push(d); db.periodEnds.sort(); save(); render(); });
+    },
+    editFlow: function (el) { var d = el.getAttribute('data-d'); ui.draft = { kind: 'flow', old: d, date: d, n: db.periodFlow[d] || 2 }; go('editPeriod'); },
+    editEnd: function (el) { var d = el.getAttribute('data-d'); ui.draft = { kind: 'end', old: d, date: d }; go('editPeriod'); },
+    flowPick: function (el) { ui.draft.n = +el.getAttribute('data-n'); render(); },
+    saveFlowEdit: function () {
+      var d = ui.draft, v = document.getElementById('periodDate').value;
+      if (!v || v > todayIso()) { toast(tr('Pick a date that is today or earlier.')); return; }
+      var oldN = db.periodFlow[d.old], clash = v !== d.old && db.periodFlow[v], clashN = db.periodFlow[v];
+      delete db.periodFlow[d.old]; db.periodFlow[v] = d.n; save(); go('history');
+      toast(tr('Changes saved'), function () { delete db.periodFlow[v]; if (clash) db.periodFlow[v] = clashN; db.periodFlow[d.old] = oldN; save(); render(); });
+    },
+    saveEndEdit: function () {
+      var d = ui.draft, v = document.getElementById('periodDate').value;
+      if (!v || v > todayIso()) { toast(tr('Pick a date that is today or earlier.')); return; }
+      var prev = db.periodEnds.slice();
+      db.periodEnds = db.periodEnds.filter(function (x) { return x !== d.old && x !== v; }); db.periodEnds.push(v); db.periodEnds.sort(); save(); go('history');
+      toast(tr('Changes saved'), function () { db.periodEnds = prev; save(); render(); });
+    },
+    editPeriod: function (el) { ui.draft = { editPeriod: el.getAttribute('data-d') }; go('editPeriod'); },
+    savePeriod: function () {
+      var old = ui.draft.editPeriod, v = document.getElementById('periodDate').value;
+      if (!v || v > todayIso()) { toast(tr('Pick a date that is today or earlier.')); return; }
+      if (v !== old && db.periodStarts.indexOf(v) !== -1) { toast(tr('A period start is already logged for that day.')); return; }
+      db.periodStarts = db.periodStarts.filter(function (x) { return x !== old; }); db.periodStarts.push(v); db.periodStarts.sort(); save(); go('history');
+      toast(tr('Changes saved'), function () { db.periodStarts = db.periodStarts.filter(function (x) { return x !== v; }); db.periodStarts.push(old); db.periodStarts.sort(); save(); render(); });
+    },
+    history: function (el) { go('history'); },
     delEntry: function (el) {
       var id = el.getAttribute('data-id'), e = db.entries.filter(function (x) { return x.id === id; })[0];
       if (!e) return;

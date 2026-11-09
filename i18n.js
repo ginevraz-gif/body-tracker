@@ -8,7 +8,9 @@
     ['{a} to {b}', 'dal {a} al {b}'], [' and ', ' e '],
 
     /* Navigation and common */
-    ['Main', 'Principale'], ['Today', 'Oggi'], ['Eat', 'Mangia'], ['Patterns', 'Tendenze'], ['Settings', 'Impostazioni'],
+    ['Main', 'Principale'], ['Today', 'Oggi'], ['Eat', 'Mangia'], ['Patterns', 'Tendenze'], ['History', 'Cronologia'], ['View all', 'Vedi tutto'], ['Period day {n}', 'Giorno {n} del ciclo'], ['How strong is your flow today?', 'Quanto è intenso il flusso oggi?'], ['Light', 'Leggero'], ['My period is over', 'Il ciclo è finito'],
+    ['Flow logged: {f}', 'Flusso registrato: {f}'], ['Flow removed', 'Flusso rimosso'], ['Period marked as over', 'Ciclo segnato come finito'], ['Flow deleted', 'Flusso eliminato'], ['Period end deleted', 'Fine del ciclo eliminata'],
+    ['Period flow', 'Flusso del ciclo'], ['Period ended', 'Ciclo finito'], ['How strong was it?', 'Quanto era intenso?'], ['Changes saved', 'Modifiche salvate'], ['Date', 'Data'], ['Edit {title} from {when}', 'Modifica {title}, {when}'], ['Settings', 'Impostazioni'],
     ['Log something', 'Registra qualcosa'], ['Undo', 'Annulla'], ['Go back', 'Indietro'], ['Save', 'Salva'], ['Done', 'Fatto'],
     ['Learn', 'Scopri'], ['Log', 'Registra'], ['Move', 'Muoviti'], ['Sleep', 'Dormi'], ['Mind', 'Mente'], ['Plan', 'Pianifica'],
     ['Body', 'Corpo'], ['Entry', 'Voce'], ['Language and seasonal produce', 'Lingua e prodotti di stagione'],
@@ -19,7 +21,7 @@
     ['Tap once to mark today as day 1', 'Tocca una volta per segnare oggi come giorno 1'],
     ['Poo tracker', 'Diario della cacca'],
     ['Bristol scale, or note that you didn’t poo', 'Scala di Bristol, oppure segna che non hai fatto la cacca'],
-    ['Back pain', 'Mal di schiena'], ['Lower back', 'Parte bassa della schiena'], ['Mid back', 'Parte centrale della schiena'],
+    ['Back pain', 'Mal di schiena'], ['Reorder', 'Riordina'], ['Edit', 'Modifica'], ['Hide from my list', 'Togli dalla lista'], ['Drag the handles to reorder, or tap the minus to take an issue off your list.', 'Trascina le maniglie per riordinare, oppure tocca il meno per toglierlo dalla lista.'], ['Nothing here yet. Tap Add to choose what you want to keep track of.', 'Ancora niente qui. Tocca Aggiungi per scegliere cosa vuoi tenere sotto controllo.'], ['Choose what you want to keep track of. You can take any of them off your list again with Edit.', 'Scegli cosa vuoi tenere sotto controllo. Puoi toglierlo di nuovo dalla lista con Modifica.'], ['Everything is already on your list.', 'Hai già tutto nella tua lista.'], ['Taken off your list: {name}', 'Tolto dalla lista: {name}'], ['Type', 'Tipo'], ['Total', 'Totale'], ['Partial', 'Parziale'], ['How severe', 'Quanto è grave'], ['Start time', 'Ora di inizio'], ['Duration', 'Durata'], ['Minutes', 'Minuti'], ['Seconds', 'Secondi'], ['Drag to reorder', 'Trascina per riordinare'], ['Drag the handles to put your issues in the order you like.', 'Trascina le maniglie per mettere i tuoi disturbi nell’ordine che preferisci.'], ['Epileptic seizure', 'Crisi epilettica'], ['How long did it last?', 'Quanto è durata?'], ['Under 1 minute', 'Meno di 1 minuto'], ['1–5 minutes', '1–5 minuti'], ['Over 5 minutes', 'Più di 5 minuti'], ['Lower back pain', 'Dolore lombare'], ['Lower back', 'Parte bassa della schiena'], ['Mid back', 'Parte centrale della schiena'],
     ['Upper back', 'Parte alta della schiena'], ['Left side', 'Lato sinistro'], ['Right side', 'Lato destro'], ['Hips', 'Fianchi'],
     ['Headache', 'Mal di testa'], ['Forehead', 'Fronte'], ['Temples', 'Tempie'], ['Back of head', 'Nuca'], ['One side', 'Un lato'],
     ['Behind the eyes', 'Dietro gli occhi'],
@@ -151,7 +153,7 @@
     ['Based on everything you have logged for this. More cycles make it more reliable.', 'Basato su tutto ciò che hai registrato. Più cicli lo rendono più affidabile.'],
     ['Your notes', 'Le tue note'], ['Didn’t poo', 'Niente cacca'], ['See all entries', 'Vedi tutte le voci'],
     ['Everything you logged', 'Tutto ciò che hai registrato'], ['All entries', 'Tutte le voci'],
-    ['Newest first. Tap the bin to delete something you logged by mistake. You can undo straight after.', 'Prima le più recenti. Tocca il cestino per eliminare qualcosa registrato per errore. Puoi annullare subito dopo.'],
+    ['Newest first. Tap the pencil to change an entry, or the bin to delete it. You can undo straight after.', 'Prima le più recenti. Tocca la matita per modificare una voce o il cestino per eliminarla. Puoi annullare subito dopo.'],
     ['Nothing logged yet.', 'Ancora niente registrato.'], ['Period started', 'Ciclo iniziato'],
     ['Delete {title} from {when}', 'Elimina {title} del {when}'],
 
