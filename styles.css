@@ -394,3 +394,7 @@ textarea { min-height: 92px; resize: vertical; }
 .phase-hero .plabel { font-size: 12px; }
 .pmini { font-size: 13px; color: var(--text, #2A2433); opacity: .8; }
 .phase-hero .pwhen.sm { font-size: 14px; margin-right: -22px; }
+.cal-head.standalone { margin: 4px 0 10px; }
+
+.lang-row { display: flex; gap: 10px; }
+.lang-row .opt { flex: 1; text-align: center; }

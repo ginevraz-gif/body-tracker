@@ -5,9 +5,7 @@
 
   /* ---------- Dates ---------- */
   var DAY = 86400000;
-  var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-  var MON_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  var WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  var MONTHS, MON_SHORT, WEEKDAYS, DOWS;
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
   function iso(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
   function parse(s) { var p = s.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
@@ -15,9 +13,35 @@
   function diffDays(a, b) { return Math.round((parse(a) - parse(b)) / DAY); }
   function addDays(s, n) { var d = parse(s); d.setDate(d.getDate() + n); return iso(d); }
   function shortDate(s) { var d = parse(s); return d.getDate() + ' ' + MON_SHORT[d.getMonth()]; }
-  function longToday() { var d = new Date(); return WEEKDAYS[d.getDay()] + ' ' + d.getDate() + ' ' + MONTHS[d.getMonth()]; }
+  function longToday() { var d = new Date(); return cap(WEEKDAYS[d.getDay()]) + ' ' + d.getDate() + ' ' + MONTHS[d.getMonth()]; }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function uid() { return Math.random().toString(36).slice(2, 10); }
+
+  /* ---------- Language (English or Italian) ---------- */
+  var LANG_KEY = 'healthtracker.lang';
+  var I18N = window.I18N || { it: {}, months: {}, monShort: {}, weekdays: {}, dows: {} };
+  var lang = 'en';
+  function detectLang() {
+    try { var s = localStorage.getItem(LANG_KEY); if (s === 'en' || s === 'it') return s; } catch (e) { /* ignore */ }
+    var n = String((navigator.languages && navigator.languages[0]) || navigator.language || 'en').toLowerCase();
+    return n.indexOf('it') === 0 ? 'it' : 'en';
+  }
+  /* tr('English text', {name: value}) returns the text in the chosen language. Unknown text (e.g. typed by the user) is returned as is. */
+  function tr(s, v) {
+    var o = s;
+    if (lang !== 'en' && I18N[lang] && Object.prototype.hasOwnProperty.call(I18N[lang], s)) o = I18N[lang][s];
+    if (v) o = o.replace(/\{(\w+)\}/g, function (m, k) { return v[k] !== undefined ? v[k] : m; });
+    return o;
+  }
+  /* Singular or plural form of a counted phrase: tn('{n} day', '{n} days', 3). */
+  function tn(one, many, n, v) { var o = { n: n }; if (v) for (var k in v) o[k] = v[k]; return tr(n === 1 ? one : many, o); }
+  function applyLang(l) {
+    lang = l;
+    MONTHS = I18N.months[l] || I18N.months.en; MON_SHORT = I18N.monShort[l] || I18N.monShort.en;
+    WEEKDAYS = I18N.weekdays[l] || I18N.weekdays.en; DOWS = I18N.dows[l] || I18N.dows.en;
+    document.documentElement.lang = l;
+  }
+  applyLang(detectLang());
 
   /* ---------- Storage ---------- */
   var KEY = 'healthtracker.v1';
@@ -65,7 +89,7 @@
     return defaultDb();
   }
   var db = load();
-  function save() { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { toast('Could not save. Storage may be full or blocked.'); } }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { toast(tr('Could not save. Storage may be full or blocked.')); } }
   function issueById(id) { for (var i = 0; i < db.issues.length; i++) if (db.issues[i].id === id) return db.issues[i]; return null; }
 
   /* ---------- Icons ---------- */
@@ -114,6 +138,10 @@
     ovulation: { label: 'Ovulation', color: 'var(--ovulation)', hex: '#B8862F' },
     luteal: { label: 'Luteal', color: 'var(--luteal)', hex: '#4B4BA0' }
   };
+  function pl(k) { return tr(PHASES[k].label); }
+  function pt(k) { return tr(PHASES[k].label + ' phase'); }
+  function iname(i) { return tr(i.name); }
+  function strengthWord(v) { return v === 0 ? tr('None') : v <= 3 ? tr('Mild') : v <= 6 ? tr('Medium') : tr('Strong'); }
   function phaseLayout() {
     var cl = db.settings.cycleLength, pl = Math.min(db.settings.periodLength, cl - 8);
     var ov = cl - 14;
@@ -242,9 +270,9 @@
   function lastLoggedText(issueId) {
     var last = null;
     db.entries.forEach(function (e) { if (e.issueId === issueId) { var d = e.end || todayIso(); if (!last || d > last) last = d; } });
-    if (!last) return 'Not logged yet';
+    if (!last) return tr('Not logged yet');
     var n = diffDays(todayIso(), last);
-    return n <= 0 ? 'Last logged today' : n === 1 ? 'Last logged yesterday' : 'Last logged ' + n + ' days ago';
+    return n <= 0 ? tr('Last logged today') : n === 1 ? tr('Last logged yesterday') : tr('Last logged {n} days ago', { n: n });
   }
   function levelFor(issue, draft) {
     if (issue.kind === 'bloat') return draft.bloat || 2;
@@ -271,7 +299,7 @@
   function toast(msg, undoFn) {
     var el = document.getElementById('toast');
     toastUndo = undoFn || null;
-    el.innerHTML = '<span>' + esc(msg) + '</span>' + (undoFn ? '<button data-act="undo">Undo</button>' : '');
+    el.innerHTML = '<span>' + esc(msg) + '</span>' + (undoFn ? '<button data-act="undo">' + tr('Undo') + '</button>' : '');
     el.className = 'show';
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { el.className = ''; }, 4500);
@@ -280,11 +308,11 @@
   /* ---------- Views ---------- */
   function navBar(active) {
     function tab(v, ic, label) {
-      return '<button class="' + (active === v ? 'on' : '') + '" data-act="go" data-v="' + v + '"' + (active === v ? ' aria-current="page"' : '') + '>' + icon(ic) + '<span>' + label + '</span></button>';
+      return '<button class="' + (active === v ? 'on' : '') + '" data-act="go" data-v="' + v + '"' + (active === v ? ' aria-current="page"' : '') + '>' + icon(ic) + '<span>' + tr(label) + '</span></button>';
     }
-    return '<nav class="nav" aria-label="Main">' +
+    return '<nav class="nav" aria-label="' + tr('Main') + '">' +
       tab('today', 'target', 'Today') + tab('eat', 'leaf', 'Eat') +
-      '<button class="fab" data-act="go" data-v="log" aria-label="Log something">' + icon('plus') + '</button>' +
+      '<button class="fab" data-act="go" data-v="log" aria-label="' + tr('Log something') + '">' + icon('plus') + '</button>' +
       tab('patterns', 'trend', 'Patterns') + tab('settings', 'sliders', 'Settings') +
       '</nav>';
   }
@@ -302,10 +330,10 @@
     });
     var ma = (info.day - 0.5) * per, t = (ma - 90) * Math.PI / 180;
     var mx = 150 + 108 * Math.cos(t), my = 150 + 108 * Math.sin(t);
-    return '<svg class="donut" viewBox="0 0 300 300" role="img" aria-label="Cycle day ' + info.rawDay + ' of about ' + cl + '">' + parts +
+    return '<svg class="donut" viewBox="0 0 300 300" role="img" aria-label="' + tr('Cycle day {d} of about {cl}', { d: info.rawDay, cl: cl }) + '">' + parts +
       '<circle cx="' + mx.toFixed(1) + '" cy="' + my.toFixed(1) + '" r="13" fill="#fff" stroke="' + PHASES[info.phase].hex + '" stroke-width="3"/>' +
-      '<text x="150" y="152" text-anchor="middle" font-size="44" font-weight="700" fill="#2A2433">Day ' + info.rawDay + '</text>' +
-      '<text x="150" y="182" text-anchor="middle" font-size="16" fill="#5F5868">of about ' + cl + '</text></svg>';
+      '<text x="150" y="152" text-anchor="middle" font-size="44" font-weight="700" fill="#2A2433">' + tr('Day {n}', { n: info.rawDay }) + '</text>' +
+      '<text x="150" y="182" text-anchor="middle" font-size="16" fill="#5F5868">' + tr('of about {n}', { n: cl }) + '</text></svg>';
   }
 
   /* ---------- Moon ring and hormone chart ---------- */
@@ -326,7 +354,7 @@
       var a = (d - 0.5) / cl * 2 * Math.PI - Math.PI / 2, cx = C + R * Math.cos(a), cy = C + R * Math.sin(a);
       var f = (d - 0.5) / cl, k = (1 - Math.cos(f * 2 * Math.PI)) / 2, waning = f > 0.5;
       var col = PHASES[phaseOfDay(d)].hex;
-      if (compact) parts += '<g data-act="moonDay" data-d="' + d + '" style="cursor:pointer" role="button" aria-label="Cycle day ' + d + '">';
+      if (compact) parts += '<g data-act="moonDay" data-d="' + d + '" style="cursor:pointer" role="button" aria-label="' + tr('Cycle day {n}', { n: d }) + '">';
       parts += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="' + mr.toFixed(1) + '" fill="#FBF3EA" stroke="' + col + '" stroke-width="2"/>';
       var p = moonPath(0, 0, mr - 1, k, waning);
       if (p) parts += '<path transform="translate(' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ')" d="' + p + '" fill="' + col + '"/>';
@@ -335,12 +363,12 @@
       if (compact) parts += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="' + (mr + 6).toFixed(1) + '" fill="transparent"/></g>';
     }
     var ph = PHASES[info.phase];
-    if (compact) return '<svg class="donut" viewBox="0 0 340 340" role="img" aria-label="Cycle day ' + info.rawDay + ' of about ' + cl + ', ' + ph.label + ' phase">' + parts +
-      '<text x="170" y="150" text-anchor="middle" font-size="26" font-weight="500" fill="#2A2433" pointer-events="none">Day</text>' +
+    if (compact) return '<svg class="donut" viewBox="0 0 340 340" role="img" aria-label="' + tr('Cycle day {d} of about {cl}, {phase}', { d: info.rawDay, cl: cl, phase: pt(info.phase) }) + '">' + parts +
+      '<text x="170" y="150" text-anchor="middle" font-size="26" font-weight="500" fill="#2A2433" pointer-events="none">' + tr('Day') + '</text>' +
       '<text x="170" y="214" text-anchor="middle" font-size="76" font-weight="700" fill="#2A2433" pointer-events="none">' + (pick || info.rawDay) + '</text></svg>';
-    return '<svg class="donut" viewBox="0 0 340 340" role="img" aria-label="Cycle day ' + info.rawDay + ' of about ' + cl + ', ' + ph.label + ' phase">' + parts +
-      '<text x="170" y="138" text-anchor="middle" font-size="15" font-weight="700" letter-spacing="2" fill="' + ph.hex + '">' + ph.label.toUpperCase() + ' PHASE</text>' +
-      '<text x="170" y="192" text-anchor="middle" font-size="56" font-weight="700" fill="#2A2433">Day ' + info.rawDay + '</text>' +
+    return '<svg class="donut" viewBox="0 0 340 340" role="img" aria-label="' + tr('Cycle day {d} of about {cl}, {phase}', { d: info.rawDay, cl: cl, phase: pt(info.phase) }) + '">' + parts +
+      '<text x="170" y="138" text-anchor="middle" font-size="15" font-weight="700" letter-spacing="2" fill="' + ph.hex + '">' + pt(info.phase).toUpperCase() + '</text>' +
+      '<text x="170" y="192" text-anchor="middle" font-size="56" font-weight="700" fill="#2A2433">' + tr('Day {n}', { n: info.rawDay }) + '</text>' +
       '<text x="170" y="224" text-anchor="middle" font-size="16" fill="#2A2433">' + esc(whenShort) + '</text></svg>';
   }
   function gauss(t, mu, sl, sr) { var s = t < mu ? sl : sr, z = (t - mu) / s; return Math.exp(-z * z / 2); }
@@ -375,11 +403,11 @@
     svg += '<line x1="' + mx + '" y1="' + (yt - 2) + '" x2="' + mx + '" y2="' + yb + '" stroke="#2A2433" stroke-width="2"/><circle cx="' + mx + '" cy="' + (yt - 2) + '" r="5" fill="#2A2433"/>';
     var bars = phaseLayout().map(function (p) {
       var a = X(p.from - 0.5 < 1 ? 1 : p.from - 0.5), b = X(p.to + 0.5 > cl ? cl : p.to + 0.5);
-      return '<rect x="' + (a + 1).toFixed(1) + '" y="' + (yb + 6) + '" width="' + Math.max(2, b - a - 2).toFixed(1) + '" height="7" rx="3.5" fill="' + PHASES[p.key].hex + '"/><text x="' + ((a + b) / 2).toFixed(1) + '" y="' + (yb + 24) + '" text-anchor="middle" font-size="9.5" font-weight="700" fill="#6B6573">' + PHASES[p.key].label + '</text>';
+      return '<rect x="' + (a + 1).toFixed(1) + '" y="' + (yb + 6) + '" width="' + Math.max(2, b - a - 2).toFixed(1) + '" height="7" rx="3.5" fill="' + PHASES[p.key].hex + '"/><text x="' + ((a + b) / 2).toFixed(1) + '" y="' + (yb + 24) + '" text-anchor="middle" font-size="9.5" font-weight="700" fill="#6B6573">' + pl(p.key) + '</text>';
     }).join('');
-    var legend = HORMONES.map(function (hm) { return '<button class="hleg' + (sel === hm.key ? ' on' : sel ? ' off' : '') + '" data-act="hormone" data-k="' + hm.key + '" aria-pressed="' + (sel === hm.key) + '"><i style="background:' + hm.hex + '"></i>' + hm.key + '</button>'; }).join('');
+    var legend = HORMONES.map(function (hm) { return '<button class="hleg' + (sel === hm.key ? ' on' : sel ? ' off' : '') + '" data-act="hormone" data-k="' + hm.key + '" aria-pressed="' + (sel === hm.key) + '"><i style="background:' + hm.hex + '"></i>' + tr(hm.key) + '</button>'; }).join('');
     return '<section class="card hpage"><div class="legend">' + legend + '</div>' +
-      '<svg viewBox="0 0 ' + W + ' ' + (H + 22) + '" class="hchart" data-act="chart" role="img" aria-label="Typical hormone levels across your cycle">' + svg + bars + '</svg>' +
+      '<svg viewBox="0 0 ' + W + ' ' + (H + 22) + '" class="hchart" data-act="chart" role="img" aria-label="' + tr('Typical hormone levels across your cycle') + '">' + svg + bars + '</svg>' +
       hormoneDesc(info) +
       '</section>';
   }
@@ -400,18 +428,18 @@
     });
     if (!hit.length) return '';
     var from = hit[0].from, to = hit[hit.length - 1].to;
-    return 'Highest in the ' + hit.map(function (p) { return PHASES[p.key].label.toLowerCase(); }).join(' and ') + (hit.length > 1 ? ' phases' : ' phase') + ', around days ' + from + ' to ' + to + '.';
+    return tr(hit.length > 1 ? 'Highest in the {phases} phases, around days {a} to {b}.' : 'Highest in the {phases} phase, around days {a} to {b}.', { phases: hit.map(function (p) { return pl(p.key).toLowerCase(); }).join(tr(' and ')), a: from, b: to });
   }
   function hormoneDesc(info) {
     var sel = ui.hSel, r = HORMONE_INFO.filter(function (x) { return x[0] === sel; })[0], hm = HORMONES.filter(function (x) { return x.key === sel; })[0];
-    if (!r || !hm) return '<p class="hhint">Tap a hormone, or a line on the chart, to see what it does.</p>';
-    return '<div class="hdesc" style="border-left-color:' + r[1] + '"><b style="color:' + r[1] + '">' + r[0] + '</b><p>' + esc(r[2]) + '</p><p class="hhigh">' + esc(highestText(hm, info)) + '</p></div>';
+    if (!r || !hm) return '<p class="hhint">' + tr('Tap a hormone, or a line on the chart, to see what it does.') + '</p>';
+    return '<div class="hdesc" style="border-left-color:' + r[1] + '"><b style="color:' + r[1] + '">' + esc(tr(r[0])) + '</b><p>' + esc(tr(r[2])) + '</p><p class="hhigh">' + esc(highestText(hm, info)) + '</p></div>';
   }
   function viewHormones() {
     var info = cycleInfo(todayIso());
     var h = banner('Learn', 'Your hormones', 'today');
-    if (!info) return h + '<p class="sub">Add your last period start on the Today screen to see your hormone chart.</p>' + navBar('today');
-    h += '<p class="sub">A typical pattern across a ' + info.cl + '-day cycle. The black line shows where you are today. Everyone is different, so treat it as a guide.</p>';
+    if (!info) return h + '<p class="sub">' + tr('Add your last period start on the Today screen to see your hormone chart.') + '</p>' + navBar('today');
+    h += '<p class="sub">' + tr('A typical pattern across a {n}-day cycle. The black line shows where you are today. Everyone is different, so treat it as a guide.', { n: info.cl }) + '</p>';
     h += hormoneCard(info);
     return h + navBar('today');
   }
@@ -419,8 +447,8 @@
   function phaseTxt(info) {
     if (ui.dayPick && ui.dayPick !== info.day) return dayDetails(info, ui.dayPick);
     var ph = PHASES[info.phase];
-    var whenShort = info.late ? 'Period may be late' : info.phase === 'period' ? 'Period day ' + info.rawDay + ' of about ' + db.settings.periodLength : 'Period in about ' + info.toPeriod + (info.toPeriod === 1 ? ' day' : ' days');
-    return '<span class="plabel" style="color:' + ph.hex + '">' + ph.label + ' phase</span><span class="pwhen">' + esc(whenShort) + '</span>';
+    var whenShort = info.late ? tr('Period may be late') : info.phase === 'period' ? tr('Period day {n} of about {m}', { n: info.rawDay, m: db.settings.periodLength }) : tn('Period in about {n} day', 'Period in about {n} days', info.toPeriod);
+    return '<span class="plabel" style="color:' + ph.hex + '">' + pt(info.phase) + '</span><span class="pwhen">' + esc(whenShort) + '</span>';
   }
   /* Drag around the moon ring to scrub through the cycle days. Updates in place so the dragged element survives. */
   var scrub = null, suppressClick = false;
@@ -456,57 +484,46 @@
   document.addEventListener('click', function (ev) { if (suppressClick) { ev.stopPropagation(); ev.preventDefault(); } }, true);
   function dayDetails(info, d) {
     var cl = info.cl, od = cl - 14, ph = PHASES[phaseOfDay(d)], date = addDays(info.start, d - 1), n = diffDays(date, todayIso());
-    var when = shortDate(date) + (n === 0 ? ' · today' : n === 1 ? ' · tomorrow' : n === -1 ? ' · yesterday' : n > 0 ? ' · in ' + n + ' days' : ' · ' + (-n) + ' days ago');
+    var when = shortDate(date) + (n === 0 ? ' · ' + tr('today') : n === 1 ? ' · ' + tr('tomorrow') : n === -1 ? ' · ' + tr('yesterday') : n > 0 ? ' · ' + tr('in {n} days', { n: n }) : ' · ' + tr('{n} days ago', { n: -n }));
     var high = HORMONES.filter(function (hm) {
       var mn = 9, mx = -9, t; for (t = 1; t <= cl; t++) { var v = hm.f(t, od); mn = Math.min(mn, v); mx = Math.max(mx, v); }
       return (hm.f(d, od) - mn) / (mx - mn) >= 0.7;
     }).map(function (hm) { return hm.key; });
-    var hl = high.length ? 'High: ' + high.join(', ') : 'All hormones low';
-    var logged = '';
-    if (n <= 0) {
-      var items = db.entries.filter(function (e) { return e.start <= date && (e.end || todayIso()) >= date; }).map(function (e) { var iss = issueById(e.issueId); return (iss ? iss.name : 'Entry') + (typeof e.strength === 'number' ? ' ' + e.strength + '/10' : ''); });
-      if (db.periodStarts.indexOf(date) !== -1) items.unshift('Period started');
-      logged = items.length ? 'Logged: ' + items.slice(0, 2).join(', ') + (items.length > 2 ? ' +' + (items.length - 2) : '') : '';
-    }
-    return '<span class="plabel" style="color:' + ph.hex + '">' + ph.label + ' phase</span><span class="pwhen sm">' + esc(when) + '</span>' +
-      (n <= 0 ? '<span class="pmini">Next one on ' + esc(shortDate(addDays(info.start, cl + d - 1))) + '</span>' : '') +
+    return '<span class="plabel" style="color:' + ph.hex + '">' + pt(phaseOfDay(d)) + '</span><span class="pwhen sm">' + esc(when) + '</span>' +
+      (n <= 0 ? '<span class="pmini">' + esc(tr('Next one on {d}', { d: shortDate(addDays(info.start, cl + d - 1)) })) + '</span>' : '') +
 
-      '<button class="plink" data-act="moonDay" data-d="' + d + '">Back to today</button>';
+      '<button class="plink" data-act="moonDay" data-d="' + d + '">' + tr('Back to today') + '</button>';
   }
   function viewToday() {
     var info = cycleInfo(todayIso());
-    var h = '<div class="banner"><div><small>' + esc(longToday()) + '</small><h1>Today</h1></div></div>';
+    var h = '<div class="banner"><div><small>' + esc(longToday()) + '</small><h1>' + tr('Today') + '</h1></div></div>';
     if (!info) {
-      return h + '<div class="card setup"><h2>When did your last period start?</h2><p>Add the first day and I will work out where you are in your cycle. You can change it any time.</p>' +
+      return h + '<div class="card setup"><h2>' + tr('When did your last period start?') + '</h2><p>' + tr('Add the first day and I will work out where you are in your cycle. You can change it any time.') + '</p>' +
         '<input type="date" id="firstStart" max="' + todayIso() + '" value="' + todayIso() + '">' +
-        '<button class="btn" data-act="firstStart">Save</button></div>' +
-        '<p class="quiet">Your data stays on this device.</p>' + navBar('today');
+        '<button class="btn" data-act="firstStart">' + tr('Save') + '</button></div>' +
+        '<p class="quiet">' + tr('Your data stays on this device.') + '</p>' + navBar('today');
     }
     var T = PHASE_TEXT[info.phase], ph = PHASES[info.phase];
-    var when;
-    if (info.late) when = 'Your period may be a few days late';
-    else if (info.phase === 'period') when = 'Period day ' + info.rawDay + ' of about ' + db.settings.periodLength;
-    else when = 'Period likely in about ' + info.toPeriod + (info.toPeriod === 1 ? ' day' : ' days');
-    var legend = phaseLayout().map(function (p) { return '<span><i style="background:' + PHASES[p.key].hex + '"></i>' + PHASES[p.key].label + '</span>'; }).join('');
+    var legend = phaseLayout().map(function (p) { return '<span><i style="background:' + PHASES[p.key].hex + '"></i>' + pl(p.key) + '</span>'; }).join('');
     h += '<section class="hero phase-hero"><div class="ph-top"><div class="ring">' + moonRing(info, '', true) + '</div><div class="phase-txt">' + phaseTxt(info) + '</div></div>' +
-      '<button class="info-btn" data-act="hormones" aria-label="Your hormones">' + icon('info') + '</button></section>';
-    if (isHormonal()) h += '<p class="quiet hbc"><b>Hormonal method:</b> phases are only a rough guide.</p>';
+      '<button class="info-btn" data-act="hormones" aria-label="' + tr('Your hormones') + '">' + icon('info') + '</button></section>';
+    if (isHormonal()) h += '<p class="quiet hbc"><b>' + tr('Hormonal method:') + '</b> ' + tr('phases are only a rough guide.') + '</p>';
     var gTap = hasGroups(T, false);
-    h += '<section class="card combo"><div class="blk likely tap" data-act="learn" data-k="going" role="button" tabindex="0"><div class="bh"><h2>What’s likely going on</h2><span class="more">Read more ' + icon('chevR') + '</span></div><p class="clamp">' + esc(T.likely) + '</p></div>' +
-      '<div class="blk doing' + (gTap ? ' tap" data-act="learn" data-k="do" role="button" tabindex="0' : '') + '"><div class="bh"><h2>Worth doing</h2>' + (gTap ? '<span class="more">Read more ' + icon('chevR') + '</span>' : '') + '</div><div class="do-list">' +
-      T.todo.map(function (r) { return '<div class="do-row"><span class="tag ' + r[0] + '">' + r[0] + '</span><p>' + esc(T.know ? r[1].split('. ')[0].replace(/\.$/, '') + '.' : r[1]) + '</p></div>'; }).join('') + '</div></div></section>';
+    h += '<section class="card combo"><div class="blk likely tap" data-act="learn" data-k="going" role="button" tabindex="0"><div class="bh"><h2>' + tr('What’s likely going on') + '</h2><span class="more">' + tr('Read more') + ' ' + icon('chevR') + '</span></div><p class="clamp">' + esc(tr(T.likely)) + '</p></div>' +
+      '<div class="blk doing' + (gTap ? ' tap" data-act="learn" data-k="do" role="button" tabindex="0' : '') + '"><div class="bh"><h2>' + tr('Worth doing') + '</h2>' + (gTap ? '<span class="more">' + tr('Read more') + ' ' + icon('chevR') + '</span>' : '') + '</div><div class="do-list">' +
+      T.todo.map(function (r) { var tx = tr(r[1]); return '<div class="do-row"><span class="tag ' + r[0] + '">' + tr(r[0]) + '</span><p>' + esc(T.know ? tx.split('. ')[0].replace(/\.$/, '') + '.' : tx) + '</p></div>'; }).join('') + '</div></div></section>';
     return h + navBar('today');
   }
 
   function banner(small, title, backTo) {
     return '<div class="banner' + (backTo ? ' has-back' : '') + '">' +
-      (backTo ? '<button class="round-btn back-btn" data-act="go" data-v="' + backTo + '" aria-label="Back">' + icon('back') + '</button>' : '') +
-      '<div><small>' + esc(small) + '</small><h1>' + esc(title) + '</h1></div></div>';
+      (backTo ? '<button class="round-btn back-btn" data-act="go" data-v="' + backTo + '" aria-label="' + tr('Go back') + '">' + icon('back') + '</button>' : '') +
+      '<div><small>' + esc(tr(small)) + '</small><h1>' + esc(tr(title)) + '</h1></div></div>';
   }
   function viewLog() {
     function row(i) {
-      var sub = (i.pinned && i.sub) ? i.sub : lastLoggedText(i.id);
-      return '<button class="big-row" data-act="pick" data-id="' + esc(i.id) + '"' + (i.preset ? ' data-preset="1"' : '') + '><span class="icon-tile ' + i.tile + '">' + icon(i.icon) + '</span><span><span class="t">' + esc(i.name) + '</span><span class="s">' + esc(sub) + '</span></span>' +
+      var sub = (i.pinned && i.sub) ? tr(i.sub) : lastLoggedText(i.id);
+      return '<button class="big-row" data-act="pick" data-id="' + esc(i.id) + '"' + (i.preset ? ' data-preset="1"' : '') + '><span class="icon-tile ' + i.tile + '">' + icon(i.icon) + '</span><span><span class="t">' + esc(iname(i)) + '</span><span class="s">' + esc(sub) + '</span></span>' +
         (i.kind === 'period' || i.kind === 'tap' ? '' : '<span class="chev">' + icon('chevR') + '</span>') + '</button>';
     }
     var pinned = db.issues.filter(function (i) { return i.pinned; });
@@ -514,11 +531,11 @@
     // Ready-made issues are always listed, so there is no need to "add" them first.
     PRESETS.forEach(function (p) { if (!issueById(p.id)) yours.push(Object.assign({ preset: true }, p)); });
     var h = banner('Log', 'What’s worth noting?', 'today') +
-      '<p class="sub" style="margin-top:8px">Everything here is optional. Only log what you want to remember.</p>' +
-      '<div class="section-h" style="color:var(--muted);font-weight:500">Pinned</div>' + pinned.map(row).join('');
-    h += '<div class="section-h" style="color:var(--muted);font-weight:500">Your issues</div>' + yours.map(row).join('');
-    h += '<button class="dashed" data-act="addIssue">' + icon('plus') + ' Something else? Add a new issue</button>';
-    h += '<p class="quiet">No streaks, no reminders. Nothing is ever overdue.</p>';
+      '<p class="sub" style="margin-top:8px">' + tr('Everything here is optional. Only log what you want to remember.') + '</p>' +
+      '<div class="section-h" style="color:var(--muted);font-weight:500">' + tr('Pinned') + '</div>' + pinned.map(row).join('');
+    h += '<div class="section-h" style="color:var(--muted);font-weight:500">' + tr('Your issues') + '</div>' + yours.map(row).join('');
+    h += '<button class="dashed" data-act="addIssue">' + icon('plus') + ' ' + tr('Something else? Add a new issue') + '</button>';
+    h += '<p class="quiet">' + tr('No streaks, no reminders. Nothing is ever overdue.') + '</p>';
     return h;
   }
 
@@ -548,7 +565,7 @@
     var first = new Date(y, mo, 1), startOffset = (first.getDay() + 6) % 7;
     var days = new Date(y, mo + 1, 0).getDate(), t = todayIso();
     var thisMonth = t.slice(0, 7) === d.calMonth;
-    var cells = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(function (w) { return '<div class="dow">' + w + '</div>'; }).join('');
+    var cells = DOWS.map(function (w) { return '<div class="dow">' + w + '</div>'; }).join('');
     for (var i = 0; i < startOffset; i++) cells += '<div></div>';
     for (var n = 1; n <= days; n++) {
       var ds = y + '-' + pad(mo + 1) + '-' + pad(n), cls = '', dis = ds > t;
@@ -558,17 +575,17 @@
       if (ds === t && !cls) cls = 'today';
       cells += '<button class="' + cls + '" ' + (dis ? 'disabled' : 'data-act="day" data-d="' + ds + '"') + '>' + n + '</button>';
     }
-    return '<div class="cal"><div class="cal-head"><button data-act="month" data-n="-1" aria-label="Previous month">' + icon('back') + '</button><span>' + MONTHS[mo] + ' ' + y + '</span>' +
-      '<button data-act="month" data-n="1" ' + (thisMonth ? 'disabled' : '') + ' aria-label="Next month">' + icon('chevR') + '</button></div><div class="cal-grid">' + cells + '</div></div>';
+    return '<div class="cal"><div class="cal-head"><button data-act="month" data-n="-1" aria-label="' + tr('Previous month') + '">' + icon('back') + '</button><span>' + cap(MONTHS[mo]) + ' ' + y + '</span>' +
+      '<button data-act="month" data-n="1" ' + (thisMonth ? 'disabled' : '') + ' aria-label="' + tr('Next month') + '">' + icon('chevR') + '</button></div><div class="cal-grid">' + cells + '</div></div>';
   }
   function dayWord(s) {
     var n = diffDays(todayIso(), s);
-    return n === 0 ? 'Today' : n === 1 ? 'Yesterday' : shortDate(s);
+    return n === 0 ? tr('Today') : n === 1 ? tr('Yesterday') : shortDate(s);
   }
   function whenText(d) {
-    if (d.ongoing) return shortDate(d.start) + ' to now, ongoing';
+    if (d.ongoing) return tr('{a} to now, ongoing', { a: shortDate(d.start) });
     if (!d.end || d.end === d.start) return dayWord(d.start);
-    return shortDate(d.start) + ' to ' + shortDate(d.end);
+    return tr('{a} to {b}', { a: shortDate(d.start), b: shortDate(d.end) });
   }
   function insightText(issue) {
     var cl = db.settings.cycleLength, since = addDays(todayIso(), -cl * 3);
@@ -580,63 +597,63 @@
     var txt;
     if (issue.kind === 'bloat') {
       var totalDays = durs.reduce(function (a, b) { return a + b; }, 0);
-      txt = 'So far: ' + totalDays + (totalDays === 1 ? ' day' : ' days') + ' in ' + cycles + (cycles === 1 ? ' cycle' : ' cycles');
+      txt = tr('So far: {n} ' + (totalDays === 1 ? 'day' : 'days') + ' in {c} ' + (cycles === 1 ? 'cycle' : 'cycles'), { n: totalDays, c: cycles });
       var pre = list.filter(function (e) { var c = cycleInfo(e.start); return c && c.rawDay > cl - 7; }).length;
-      if (db.periodStarts.length && pre / list.length >= 0.6) txt += ', mostly before your period';
+      if (db.periodStarts.length && pre / list.length >= 0.6) txt += tr(', mostly before your period');
     } else {
-      txt = 'So far: ' + list.length + (list.length === 1 ? ' time' : ' times') + ' in ' + cycles + (cycles === 1 ? ' cycle' : ' cycles') + ', usually ' + (lo === hi ? lo : lo + ' to ' + hi) + (hi === 1 ? ' day' : ' days');
+      txt = tr('So far: {n} ' + (list.length === 1 ? 'time' : 'times') + ' in {c} ' + (cycles === 1 ? 'cycle' : 'cycles') + ', usually {r}', { n: list.length, c: cycles, r: tn('{n} day', '{n} days', hi, { n: lo === hi ? lo : lo + '–' + hi }) });
     }
     return '<div class="insight">' + esc(txt) + '</div>';
   }
 
   function historyCard(issue) {
     var list = db.entries.filter(function (e) { return e.issueId === issue.id; }).sort(function (a, b) { return a.start < b.start ? 1 : a.start > b.start ? -1 : 0; });
-    if (!list.length) return '<div class="last-card"><b>First time logging this</b><span>Next time you will see your history here.</span></div>';
+    if (!list.length) return '<div class="last-card"><b>' + tr('First time logging this') + '</b><span>' + tr('Next time you will see your history here.') + '</span></div>';
     var l = list[0], last = l.end || todayIso(), n = diffDays(todayIso(), last);
-    var ago = n <= 0 ? 'Today' : n === 1 ? 'Yesterday' : n + ' days ago';
-    var head = (n <= 0 && !l.end) ? 'Still going since ' + shortDate(l.start) : 'Last time: ' + ago.toLowerCase();
+    var ago = n <= 0 ? tr('Today') : n === 1 ? tr('Yesterday') : tr('{n} days ago', { n: n });
+    var head = (n <= 0 && !l.end) ? tr('Still going since {d}', { d: shortDate(l.start) }) : tr('Last time: {ago}', { ago: ago.toLowerCase() });
     var rows = list.slice(0, 5).map(function (e) {
-      var dt = e.end && e.end !== e.start ? shortDate(e.start) + ' to ' + shortDate(e.end) : shortDate(e.start);
+      var dt = e.end && e.end !== e.start ? tr('{a} to {b}', { a: shortDate(e.start), b: shortDate(e.end) }) : shortDate(e.start);
       return '<li><span>' + esc(dt) + '</span><em>' + esc(describeEntry(e).detail || '—') + '</em></li>';
     }).join('');
-    return '<div class="last-card"><b>' + esc(head) + '</b><span>' + list.length + (list.length === 1 ? ' time' : ' times') + ' logged in total</span><ul>' + rows + '</ul></div>';
+    return '<div class="last-card"><b>' + esc(head) + '</b><span>' + tn('{n} time logged in total', '{n} times logged in total', list.length) + '</span><ul>' + rows + '</ul></div>';
   }
   function viewIssue() {
     var d = ui.draft, issue = issueById(d.issueId);
     var ci = cycleInfo(todayIso());
-    var h = banner('Log', issue.name, 'log') +
-      '<p class="sub">' + (ci ? 'Cycle day ' + ci.rawDay + ' is added for you.' : 'Add a few details if you like.') + '</p>';
+    var h = banner('Log', iname(issue), 'log') +
+      '<p class="sub">' + (ci ? tr('Cycle day {n} is added for you.', { n: ci.rawDay }) : tr('Add a few details if you like.')) + '</p>';
     h += insightText(issue);
     if (issue.kind !== 'poop' && issue.kind !== 'period') h += historyCard(issue);
 
     if (issue.kind === 'poop') {
-      h += '<button class="btn-outline warn ' + (d.noPoo ? 'on' : '') + '" style="margin-top:18px" data-act="noPoo">' + (d.noPoo ? '✓ ' : '') + 'I didn’t poo</button>';
+      h += '<button class="btn-outline warn ' + (d.noPoo ? 'on' : '') + '" style="margin-top:18px" data-act="noPoo">' + (d.noPoo ? '✓ ' : '') + tr('I didn’t poo') + '</button>';
     }
     if (issue.kind === 'poop' && !d.noPoo) {
-      h += '<div class="label">What did it look like?</div>';
-      h += BRISTOL.map(function (b) { return '<button class="bristol t-' + ({ 1: 'red', 2: 'yellow', 3: 'green', 4: 'green', 5: 'yellow', 6: 'red', 7: 'red' }[b[0]]) + ' ' + (d.bristol === b[0] ? 'on' : '') + '" data-act="bristol" data-n="' + b[0] + '"><span class="art">' + bristolArt(b[0]) + '</span><span><span class="n">' + b[1] + '</span><span class="d">' + b[2] + '</span></span></button>'; }).join('');
+      h += '<div class="label">' + tr('What did it look like?') + '</div>';
+      h += BRISTOL.map(function (b) { return '<button class="bristol t-' + ({ 1: 'red', 2: 'yellow', 3: 'green', 4: 'green', 5: 'yellow', 6: 'red', 7: 'red' }[b[0]]) + ' ' + (d.bristol === b[0] ? 'on' : '') + '" data-act="bristol" data-n="' + b[0] + '"><span class="art">' + bristolArt(b[0]) + '</span><span><span class="n">' + tr(b[1]) + '</span><span class="d">' + tr(b[2]) + '</span></span></button>'; }).join('');
     }
     if (issue.where && issue.where.length) {
-      h += '<div class="label">Where</div><div class="opts">' + issue.where.map(function (w) { return '<button class="opt ' + (d.where === w ? 'on' : '') + '" data-act="where" data-w="' + esc(w) + '">' + esc(w) + '</button>'; }).join('') + '</div>';
+      h += '<div class="label">' + tr('Where') + '</div><div class="opts">' + issue.where.map(function (w) { return '<button class="opt ' + (d.where === w ? 'on' : '') + '" data-act="where" data-w="' + esc(w) + '">' + esc(tr(w)) + '</button>'; }).join('') + '</div>';
     }
     if (issue.symptoms && issue.symptoms.length) {
-      h += '<div class="label">What are you feeling? Pick any</div><div class="opts">' + issue.symptoms.map(function (s) { return '<button class="opt ' + (d.symptoms.indexOf(s) !== -1 ? 'on' : '') + '" data-act="symptom" data-s="' + esc(s) + '">' + esc(s) + '</button>'; }).join('') + '</div>';
+      h += '<div class="label">' + tr('What are you feeling? Pick any') + '</div><div class="opts">' + issue.symptoms.map(function (s) { return '<button class="opt ' + (d.symptoms.indexOf(s) !== -1 ? 'on' : '') + '" data-act="symptom" data-s="' + esc(s) + '">' + esc(tr(s)) + '</button>'; }).join('') + '</div>';
     }
     if (issue.kind === 'pain' || issue.kind === 'custom' || issue.kind === 'gut') {
-      var word = d.strength === 0 ? 'None' : d.strength <= 3 ? 'Mild' : d.strength <= 6 ? 'Medium' : 'Strong';
-      h += '<div class="strong-label"><span>' + (issue.kind === 'pain' ? 'How bad is the pain' : 'How strong') + '</span><b id="strengthLabel">' + word + '</b></div>';
+      var word = strengthWord(d.strength);
+      h += '<div class="strong-label"><span>' + (issue.kind === 'pain' ? tr('How bad is the pain') : tr('How strong')) + '</span><b id="strengthLabel">' + word + '</b></div>';
       h += '<div class="slider-wrap"><div class="bubble" id="bubble" style="--v:' + d.strength + '">' + d.strength + '</div>' +
-        '<input type="range" class="slider" min="0" max="10" step="1" value="' + d.strength + '" data-range="strength" aria-label="Strength from 0 to 10"></div>';
-      h += '<div class="scale-cap"><span>' + (issue.kind === 'pain' ? 'No pain' : 'None') + '</span><span>' + (issue.kind === 'pain' ? 'Worst ever' : 'Worst ever') + '</span></div>';
+        '<input type="range" class="slider" min="0" max="10" step="1" value="' + d.strength + '" data-range="strength" aria-label="' + tr('Strength from 0 to 10') + '"></div>';
+      h += '<div class="scale-cap"><span>' + (issue.kind === 'pain' ? tr('No pain') : tr('None')) + '</span><span>' + tr('Worst ever') + '</span></div>';
     }
     if (issue.kind === 'bloat') {
-      h += '<div class="label">How bloated</div><div class="scale scale3">' + [[1, 'Mild'], [2, 'Noticeable'], [3, 'Heavy']].map(function (o) { return '<button class="opt ' + (d.bloat === o[0] ? 'on' : '') + '" data-act="bloat" data-n="' + o[0] + '">' + o[1] + '</button>'; }).join('') + '</div>';
+      h += '<div class="label">' + tr('How bloated') + '</div><div class="scale scale3">' + [[1, 'Mild'], [2, 'Noticeable'], [3, 'Heavy']].map(function (o) { return '<button class="opt ' + (d.bloat === o[0] ? 'on' : '') + '" data-act="bloat" data-n="' + o[0] + '">' + tr(o[1]) + '</button>'; }).join('') + '</div>';
     }
-    h += '<div class="label" style="margin-bottom:4px">When</div><div class="when-row"><div class="when">' + esc(whenText(d)) + '</div>' +
-      '<button class="link-btn" data-act="toggleCal">' + (d.showCal ? 'Done' : 'Change date or range') + '</button></div>';
-    if (d.showCal) h += '<p class="sub" style="margin:2px 0 0">Tap a day. Tap a later day to make it a range.</p>' + calendarHtml(d);
-    h += '<div class="label">Note for yourself</div><textarea data-input="note" placeholder="What you ate, stress, travel, anything">' + esc(d.note) + '</textarea>';
-    h += '<button class="btn" data-act="saveEntry">Save</button>';
+    h += '<div class="label" style="margin-bottom:4px">' + tr('When') + '</div><div class="when-row"><div class="when">' + esc(whenText(d)) + '</div>' +
+      '<button class="link-btn" data-act="toggleCal">' + (d.showCal ? tr('Done') : tr('Change date or range')) + '</button></div>';
+    if (d.showCal) h += '<p class="sub" style="margin:2px 0 0">' + tr('Tap a day. Tap a later day to make it a range.') + '</p>' + calendarHtml(d);
+    h += '<div class="label">' + tr('Note for yourself') + '</div><textarea data-input="note" placeholder="' + esc(tr('What you ate, stress, travel, anything')) + '">' + esc(d.note) + '</textarea>';
+    h += '<button class="btn" data-act="saveEntry">' + tr('Save') + '</button>';
     return h;
   }
 
@@ -644,16 +661,16 @@
     var d = ui.draft;
     var tiles = ISSUE_TILES;
     return banner('Log', 'Add an issue', 'log') +
-      '<p class="sub">For something that is not in the list. It will then stay there for next time.</p>' +
-      '<div class="label" style="margin-top:6px">Name</div><input type="text" data-input="name" maxlength="40" placeholder="e.g. Headache" value="' + esc(d.name) + '">' +
-      '<div class="label">Icon</div><div class="icon-pick">' + tiles.map(function (t, i) { return '<button class="' + (d.tileIdx === i ? 'on' : '') + '" data-act="tile" data-n="' + i + '" aria-label="' + t[2] + '"><span class="icon-tile ' + t[1] + '">' + icon(t[0]) + '</span><span class="lbl">' + t[2] + '</span></button>'; }).join('') + '</div>' +
-      '<button class="btn" data-act="saveIssue">Add issue</button>';
+      '<p class="sub">' + tr('For something that is not in the list. It will then stay there for next time.') + '</p>' +
+      '<div class="label" style="margin-top:6px">' + tr('Name') + '</div><input type="text" data-input="name" maxlength="40" placeholder="' + esc(tr('e.g. Headache')) + '" value="' + esc(d.name) + '">' +
+      '<div class="label">' + tr('Icon') + '</div><div class="icon-pick">' + tiles.map(function (t, i) { return '<button class="' + (d.tileIdx === i ? 'on' : '') + '" data-act="tile" data-n="' + i + '" aria-label="' + tl(t[2]) + '"><span class="icon-tile ' + t[1] + '">' + icon(t[0]) + '</span><span class="lbl">' + tl(t[2]) + '</span></button>'; }).join('') + '</div>' +
+      '<button class="btn" data-act="saveIssue">' + tr('Add issue') + '</button>';
   }
   var ISSUE_TILES = [['headache', 'tile-yellow', 'Head'], ['neck', 'tile-yellow', 'Neck'], ['spine', 'tile-yellow', 'Back'], ['lungs', 'tile-blue', 'Chest'], ['heart', 'tile-pink', 'Heart'],
     ['breast', 'tile-pink', 'Breast'], ['gut', 'tile-lilac', 'Gut'], ['uterus', 'tile-pink', 'Womb'], ['bladder', 'tile-blue', 'Bladder'], ['eye', 'tile-orange', 'Eyes']];
 
   var BC = [
-    ['none', 'None', 'Natural cycle', 'Cycle phases and phase-based tips work as shown.'],
+    ['none', 'No method', 'Natural cycle', 'Cycle phases and phase-based tips work as shown.'],
     ['combined', 'Combined pill', 'Hormonal method', 'Hormones keep ovulation quiet, so phases are only a rough guide. The monthly bleed is a withdrawal bleed.'],
     ['progestin', 'Progestin-only pill', 'Hormonal method', 'Ovulation and bleeding can vary a lot, so phases are only a rough guide.'],
     ['patch', 'Patch or ring', 'Hormonal method', 'Hormones keep ovulation quiet, so phases are only a rough guide.'],
@@ -673,21 +690,24 @@
   function viewSettings() {
     var s = db.settings, cur = BC.filter(function (b) { return b[0] === s.birthControl; })[0] || BC[0];
     var h = banner('Your cycle and data', 'Settings') +
-      '<div class="label" style="margin-top:14px">Your cycle</div><div class="stepper-card">' +
-      '<div class="stepper"><span>Cycle length</span><span class="ctl"><button data-act="step" data-k="cycleLength" data-n="-1" aria-label="Shorter">−</button><span>' + s.cycleLength + ' days</span><button data-act="step" data-k="cycleLength" data-n="1" aria-label="Longer">+</button></span></div>' +
-      '<div class="stepper"><span>Period length</span><span class="ctl"><button data-act="step" data-k="periodLength" data-n="-1" aria-label="Shorter">−</button><span>' + s.periodLength + ' days</span><button data-act="step" data-k="periodLength" data-n="1" aria-label="Longer">+</button></span></div></div>';
-    h += '<div class="label">Birth control</div>';
-    h += '<button class="bc-row ' + (ui.bcOpen ? 'open' : '') + '" data-act="bcToggle" aria-expanded="' + (ui.bcOpen ? 'true' : 'false') + '"><span>' + cur[1] + '</span>' + icon('chevR') + '</button>';
-    if (ui.bcOpen) h += '<div style="margin-top:10px">' + BC.map(function (b) { return '<button class="radio ' + (s.birthControl === b[0] ? 'on' : '') + '" data-act="bc" data-v="' + b[0] + '"><i></i>' + b[1] + '</button>'; }).join('') + '</div>';
-    h += '<div class="note-card"><div class="small">What changes in the app</div><span class="chip">' + cur[2] + '</span><p>' + cur[3] + '</p></div>';
-    h += '<div class="label">Last period started</div>';
+      '<div class="label" style="margin-top:14px">' + tr('Language and seasonal produce') + '</div><div class="lang-row">' +
+      '<button class="opt ' + (lang === 'en' ? 'on' : '') + '" data-act="setLang" data-l="en" aria-label="English, Dutch seasonal produce" aria-pressed="' + (lang === 'en') + '">EN / NL</button>' +
+      '<button class="opt ' + (lang === 'it' ? 'on' : '') + '" data-act="setLang" data-l="it" aria-label="Italiano, prodotti di stagione italiani" aria-pressed="' + (lang === 'it') + '">IT / IT</button></div>' +
+      '<div class="label">' + tr('Your cycle') + '</div><div class="stepper-card">' +
+      '<div class="stepper"><span>' + tr('Cycle length') + '</span><span class="ctl"><button data-act="step" data-k="cycleLength" data-n="-1" aria-label="' + tr('Shorter') + '">−</button><span>' + tr('{n} days', { n: s.cycleLength }) + '</span><button data-act="step" data-k="cycleLength" data-n="1" aria-label="' + tr('Longer') + '">+</button></span></div>' +
+      '<div class="stepper"><span>' + tr('Period length') + '</span><span class="ctl"><button data-act="step" data-k="periodLength" data-n="-1" aria-label="' + tr('Shorter') + '">−</button><span>' + tr('{n} days', { n: s.periodLength }) + '</span><button data-act="step" data-k="periodLength" data-n="1" aria-label="' + tr('Longer') + '">+</button></span></div></div>';
+    h += '<div class="label">' + tr('Birth control') + '</div>';
+    h += '<button class="bc-row ' + (ui.bcOpen ? 'open' : '') + '" data-act="bcToggle" aria-expanded="' + (ui.bcOpen ? 'true' : 'false') + '"><span>' + tr(cur[1]) + '</span>' + icon('chevR') + '</button>';
+    if (ui.bcOpen) h += '<div style="margin-top:10px">' + BC.map(function (b) { return '<button class="radio ' + (s.birthControl === b[0] ? 'on' : '') + '" data-act="bc" data-v="' + b[0] + '"><i></i>' + tr(b[1]) + '</button>'; }).join('') + '</div>';
+    h += '<div class="note-card"><div class="small">' + tr('What changes in the app') + '</div><span class="chip">' + tr(cur[2]) + '</span><p>' + tr(cur[3]) + '</p></div>';
+    h += '<div class="label">' + tr('Last period started') + '</div>';
     var ls = db.periodStarts.slice().sort().pop() || '';
-    h += '<input type="date" id="lastStart" max="' + todayIso() + '" value="' + ls + '"><button class="btn secondary" data-act="saveLastStart">Update date</button>';
-    h += '<div class="label">Your data</div><p class="sub">Everything is stored only on this device. Make a backup now and then, because clearing browser data would erase it.</p>' +
-      '<button class="btn secondary" data-act="importNotes">Import data</button>' +
-      '<button class="btn secondary" data-act="export">Download backup</button>' +
-      '<button class="btn danger" data-act="wipe">Delete all my data</button>';
-    h += '<div class="label">Sources</div><p class="sub">Personal perspectives, not medical advice. The tips in the app are my own summaries of:</p><ul class="know" style="margin-bottom:16px">' + SOURCES.map(function (r) { return '<li><a href="' + r[2] + '" target="_blank" rel="noopener">' + esc(r[1]) + '</a> (' + esc(r[0]) + ')</li>'; }).join('') + '</ul>';
+    h += '<input type="date" id="lastStart" max="' + todayIso() + '" value="' + ls + '"><button class="btn secondary" data-act="saveLastStart">' + tr('Update date') + '</button>';
+    h += '<div class="label">' + tr('Your data') + '</div><p class="sub">' + tr('Everything is stored only on this device. Make a backup now and then, because clearing browser data would erase it.') + '</p>' +
+      '<button class="btn secondary" data-act="importNotes">' + tr('Import data') + '</button>' +
+      '<button class="btn secondary" data-act="export">' + tr('Download backup') + '</button>' +
+      '<button class="btn danger" data-act="wipe">' + tr('Delete all my data') + '</button>';
+    h += '<div class="label">' + tr('Sources') + '</div><p class="sub">' + tr('Personal perspectives, not medical advice. The tips in the app are my own summaries of:') + '</p><ul class="know" style="margin-bottom:16px">' + SOURCES.map(function (r) { return '<li><a href="' + r[2] + '" target="_blank" rel="noopener">' + esc(r[1]) + '</a> (' + esc(r[0]) + ')</li>'; }).join('') + '</ul>';
     return h + navBar('settings');
   }
 
@@ -707,91 +727,90 @@
   }
   function viewPatterns() {
     var t = todayIso(), first = firstDataDate();
-    var h = '<div class="banner"><div><small>' + (first ? 'Your days at a glance' : 'Nothing yet') + '</small><h1>Patterns</h1></div></div>';
+    var h = '<div class="banner"><div><small>' + (first ? tr('Your days at a glance') : tr('Nothing yet')) + '</small><h1>' + tr('Patterns') + '</h1></div></div>';
     if (!first || !db.entries.length) {
-      return h + '<div class="card empty"><h2>No patterns yet</h2><p>Log a few days with the + button and your patterns will show up here.</p></div>' + navBar('patterns');
+      return h + '<div class="card empty"><h2>' + tr('No patterns yet') + '</h2><p>' + tr('Log a few days with the + button and your patterns will show up here.') + '</p></div>' + navBar('patterns');
     }
     var cur = t.slice(0, 7), ym = ui.patMonth || cur;
     if (ym > cur) ym = cur;
     var firstYm = first.slice(0, 7);
     if (ym < firstYm) ym = firstYm;
-    if (ui.patIssue && !issueById(ui.patIssue)) ui.patIssue = null;
-    var sel = ui.patIssue, selIssue = sel ? issueById(sel) : null;
-    var levels = dayLevels(sel), all = monthDays(ym);
-    var filterIssues = db.issues.filter(function (x) { return x.kind !== 'period'; });
-    h += '<div class="chip-row"><button class="opt sm ' + (!sel ? 'on' : '') + '" data-act="patIssue" data-id="">All</button>' +
-      filterIssues.map(function (x) { return '<button class="opt sm ' + (sel === x.id ? 'on' : '') + '" data-act="patIssue" data-id="' + esc(x.id) + '">' + esc(x.name) + '</button>'; }).join('') + '</div>';
-    h += '<button class="opt sm toggle ' + (ui.patCycle ? 'on' : '') + '" data-act="patCycle" aria-pressed="' + (ui.patCycle ? 'true' : 'false') + '">' + (ui.patCycle ? '✓ ' : '') + 'Show my cycle</button>';
-    var offset = (new Date(+ym.slice(0, 4), +ym.slice(5, 7) - 1, 1).getDay() + 6) % 7;
-    var cells = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(function (w) { return '<div class="dow">' + w + '</div>'; }).join('');
-    for (var b = 0; b < offset; b++) cells += '<div></div>';
-    all.forEach(function (d, idx) {
-      var cls = d > t ? 'future' : d < first ? 'before' : 'l' + (levels[d] || 0);
-      if (d === t) cls += ' today';
-      var phStyle = '', phName = '';
-      if (ui.patCycle && d <= t) {
-        var ci = cycleInfo(d);
-        if (ci) { cls += ' hasph'; phStyle = ' style="--ph:' + PHASES[ci.phase].hex + '"'; phName = ' · ' + PHASES[ci.phase].label; }
-      }
-      cells += '<div class="pcell ' + cls + '"' + phStyle + ' title="' + shortDate(d) + phName + '">' + (idx + 1) + '</div>';
-    });
-    h += '<section class="card"><div class="cal-head"><button data-act="patMonth" data-n="-1" ' + (ym <= firstYm ? 'disabled' : '') + ' aria-label="Previous month">' + icon('back') + '</button>' +
-      '<span>' + MONTHS[+ym.slice(5, 7) - 1] + ' ' + ym.slice(0, 4) + '</span>' +
-      '<button data-act="patMonth" data-n="1" ' + (ym >= cur ? 'disabled' : '') + ' aria-label="Next month">' + icon('chevR') + '</button></div>' +
-      '<div class="pgrid">' + cells + '</div>' +
-      '<div class="hlegend"><span><i class="l0"></i>Good</span><span><i class="l1"></i>Mild</span><span><i class="l2"></i>Medium</span><span><i class="l3"></i>Strong</span></div>' +
-      (ui.patCycle ? '<div class="legend" style="margin-top:12px">' + phaseLayout().map(function (p) { return '<span><i style="background:' + PHASES[p.key].hex + '"></i>' + PHASES[p.key].label + '</span>'; }).join('') + '</div>' : '') +
-      '</section>';
-
+    var all = monthDays(ym);
     var days = all.filter(function (d) { return d <= t && d >= first; }), N = days.length;
     var prevAll = monthDays(shiftMonth(ym, -1)), comparable = first <= prevAll[0];
+    var offset = (new Date(+ym.slice(0, 4), +ym.slice(5, 7) - 1, 1).getDay() + 6) % 7;
+    var dows = DOWS.map(function (w) { return '<div class="dow">' + w + '</div>'; }).join('');
     var colors = ['#B04F1E', '#4B4BA0', '#3F7A63', '#8B3A5A', '#B8862F', '#1F4A78'];
-    var rows = N ? filterIssues.filter(function (x) { return !sel || x.id === sel; }).map(function (x, idx) {
-      return { x: x, n: daysIn(x.id, days), p: comparable ? daysIn(x.id, prevAll) : null, c: colors[idx % colors.length] };
-    }).filter(function (r) { return r.n > 0 || (r.p || 0) > 0; }) : [];
-    if (rows.length) {
-      h += '<section class="card"><h2>By issue</h2>' + rows.map(function (r) {
-        var cmp = r.p === null ? '' : r.n === r.p ? 'Same as last month' : r.n < r.p ? (r.p - r.n) + ' fewer than last month' : (r.n - r.p) + ' more than last month';
-        return '<div class="issue-row"><div class="top"><span>' + esc(r.x.name) + '</span><span>' + r.n + (r.n === 1 ? ' day' : ' days') + '</span></div><div class="bar"><i style="width:' + Math.max(2, Math.round(r.n / N * 100)) + '%;background:' + r.c + '"></i></div>' + (cmp ? '<small>' + cmp + '</small>' : '') + '</div>';
-      }).join('') + '</section>';
-    }
-    if (selIssue && db.periodStarts.length) {
-      var phDays = { period: 0, follicular: 0, ovulation: 0, luteal: 0 }, total = 0, seen = {};
-      db.entries.forEach(function (e) {
-        if (e.issueId !== sel) return;
-        entryDays(e).forEach(function (d) {
-          if (seen[d]) return; seen[d] = 1;
-          var ci = cycleInfo(d); if (!ci) return;
-          phDays[ci.phase]++; total++;
-        });
+
+    h += '<div class="cal-head standalone"><button data-act="patMonth" data-n="-1" ' + (ym <= firstYm ? 'disabled' : '') + ' aria-label="' + tr('Previous month') + '">' + icon('back') + '</button>' +
+      '<span>' + cap(MONTHS[+ym.slice(5, 7) - 1]) + ' ' + ym.slice(0, 4) + '</span>' +
+      '<button data-act="patMonth" data-n="1" ' + (ym >= cur ? 'disabled' : '') + ' aria-label="' + tr('Next month') + '">' + icon('chevR') + '</button></div>';
+    h += '<button class="opt sm toggle ' + (ui.patCycle ? 'on' : '') + '" data-act="patCycle" aria-pressed="' + (ui.patCycle ? 'true' : 'false') + '">' + (ui.patCycle ? '✓ ' : '') + tr('Show my cycle') + '</button>';
+
+    // One section per logged issue, never mixed together.
+    var logged = {};
+    db.entries.forEach(function (e) { logged[e.issueId] = 1; });
+    var issues = db.issues.filter(function (x) { return x.kind !== 'period' && logged[x.id]; });
+    issues.forEach(function (x, idx) {
+      var levels = dayLevels(x.id), n = daysIn(x.id, days), p = comparable ? daysIn(x.id, prevAll) : null;
+      var cells = dows;
+      for (var b = 0; b < offset; b++) cells += '<div></div>';
+      all.forEach(function (d, i) {
+        var cls = d > t ? 'future' : d < first ? 'before' : 'l' + (levels[d] || 0);
+        if (d === t) cls += ' today';
+        var phStyle = '', phName = '';
+        if (ui.patCycle && d <= t) {
+          var ci = cycleInfo(d);
+          if (ci) { cls += ' hasph'; phStyle = ' style="--ph:' + PHASES[ci.phase].hex + '"'; phName = ' · ' + pl(ci.phase); }
+        }
+        cells += '<div class="pcell ' + cls + '"' + phStyle + ' title="' + shortDate(d) + phName + '">' + (i + 1) + '</div>';
       });
-      if (total) {
-        h += '<section class="card"><h2>When ' + esc(selIssue.name.toLowerCase()) + ' tends to happen</h2>' + phaseLayout().map(function (p) {
-          var n = phDays[p.key], pct = Math.round(n / total * 100);
-          return '<div class="issue-row"><div class="top"><span>' + PHASES[p.key].label + '</span><span>' + n + (n === 1 ? ' day' : ' days') + '</span></div><div class="bar"><i style="width:' + (n ? Math.max(2, pct) : 0) + '%;background:' + PHASES[p.key].hex + '"></i></div><small>' + pct + '% of your logged days</small></div>';
-        }).join('') + '<p class="sub" style="margin:12px 0 0;font-size:14px">Based on everything you have logged for this. More cycles make it more reliable.</p></section>';
+      var cmp = p === null ? '' : n === p ? tr('Same as last month') : n < p ? tr('{n} fewer than last month', { n: p - n }) : tr('{n} more than last month', { n: n - p });
+      h += '<section class="card"><div class="issue-row" style="margin-bottom:14px"><div class="top"><span>' + esc(iname(x)) + '</span><span>' + tn('{n} day', '{n} days', n) + '</span></div>' +
+        (N ? '<div class="bar"><i style="width:' + (n ? Math.max(2, Math.round(n / N * 100)) : 0) + '%;background:' + colors[idx % colors.length] + '"></i></div>' : '') +
+        (cmp ? '<small>' + cmp + '</small>' : '') + '</div>' +
+        '<div class="pgrid">' + cells + '</div>' +
+        '<div class="hlegend"><span><i class="l0"></i>' + tr('Good') + '</span><span><i class="l1"></i>' + tr('Mild') + '</span><span><i class="l2"></i>' + tr('Medium') + '</span><span><i class="l3"></i>' + tr('Strong') + '</span></div>';
+
+      if (db.periodStarts.length) {
+        var phDays = { period: 0, follicular: 0, ovulation: 0, luteal: 0 }, total = 0, seen = {};
+        db.entries.forEach(function (e) {
+          if (e.issueId !== x.id) return;
+          entryDays(e).forEach(function (d) {
+            if (seen[d]) return; seen[d] = 1;
+            var ci = cycleInfo(d); if (!ci) return;
+            phDays[ci.phase]++; total++;
+          });
+        });
+        if (total) {
+          h += '<div class="label" style="margin-top:18px">' + tr('When it tends to happen') + '</div>' + phaseLayout().map(function (ph) {
+            var c = phDays[ph.key], pct = Math.round(c / total * 100);
+            return '<div class="issue-row"><div class="top"><span>' + pl(ph.key) + '</span><span>' + tn('{n} day', '{n} days', c) + '</span></div><div class="bar"><i style="width:' + (c ? Math.max(2, pct) : 0) + '%;background:' + PHASES[ph.key].hex + '"></i></div><small>' + tr('{n}% of your logged days', { n: pct }) + '</small></div>';
+          }).join('') + '<p class="sub" style="margin:12px 0 0;font-size:14px">' + tr('Based on everything you have logged for this. More cycles make it more reliable.') + '</p>';
+        }
       }
-    }
-    var notes = db.entries.filter(function (e) { return (!sel || e.issueId === sel) && e.note && e.start.slice(0, 7) === ym; }).sort(function (a, b) { return a.start < b.start ? 1 : -1; });
-    if (notes.length) {
-      h += '<div class="section-h">Your notes</div>' + notes.map(function (e) {
-        var iss = issueById(e.issueId);
-        return '<div class="note-item"><small>' + shortDate(e.start) + ' · ' + esc(e.symptoms ? e.symptoms.join(', ') : e.noPoo ? 'Didn’t poo' : (e.where ? e.where + ' ' : '') + (iss ? (e.where ? iss.name.toLowerCase() : iss.name) : '')) + '</small>' + esc(e.note) + '</div>';
-      }).join('');
-    }
-    h += '<button class="btn secondary" data-act="history" data-from="patterns">See all entries</button>';
+
+      var notes = db.entries.filter(function (e) { return e.issueId === x.id && e.note && e.start.slice(0, 7) === ym; }).sort(function (a, b) { return a.start < b.start ? 1 : -1; });
+      if (notes.length) {
+        h += '<div class="label" style="margin-top:18px">' + tr('Your notes') + '</div>' + notes.map(function (e) {
+          return '<div class="note-item"><small>' + shortDate(e.start) + (e.symptoms && e.symptoms.length ? ' · ' + esc(e.symptoms.map(function (z) { return tr(z); }).join(', ')) : e.noPoo ? ' · ' + tr('Didn’t poo') : e.where ? ' · ' + esc(tr(e.where)) : '') + '</small>' + esc(e.note) + '</div>';
+        }).join('');
+      }
+      h += '</section>';
+    });
+    h += '<button class="btn secondary" data-act="history" data-from="patterns">' + tr('See all entries') + '</button>';
     return h + navBar('patterns');
   }
 
   function describeEntry(e) {
     var iss = issueById(e.issueId), bits = [];
-    if (e.symptoms && e.symptoms.length) bits.push(e.symptoms.join(', '));
-    if (e.where) bits.push(e.where);
-    if (e.noPoo) bits.push('Didn’t poo');
-    else if (e.bristol) bits.push('Type ' + e.bristol + ': ' + BRISTOL[e.bristol - 1][1]);
-    if (e.bloat) bits.push(['', 'Mild', 'Noticeable', 'Heavy'][e.bloat]);
+    if (e.symptoms && e.symptoms.length) bits.push(e.symptoms.map(function (z) { return tr(z); }).join(', '));
+    if (e.where) bits.push(tr(e.where));
+    if (e.noPoo) bits.push(tr('Didn’t poo'));
+    else if (e.bristol) bits.push(tr('Type {n}: {name}', { n: e.bristol, name: tr(BRISTOL[e.bristol - 1][1]) }));
+    if (e.bloat) bits.push(tr(['', 'Mild', 'Noticeable', 'Heavy'][e.bloat]));
     if (typeof e.strength === 'number') bits.push(e.strength + '/10');
-    return { title: iss ? iss.name : 'Deleted issue', detail: bits.join(' · ') };
+    return { title: iss ? iname(iss) : tr('Deleted issue'), detail: bits.join(' · ') };
   }
   function viewHistory() {
     var rows = [];
@@ -799,17 +818,17 @@
     db.periodStarts.forEach(function (s) { rows.push({ type: 'period', date: s }); });
     rows.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
     var h = banner('Everything you logged', 'All entries', ui.histFrom) +
-      '<p class="sub">Newest first. Tap the bin to delete something you logged by mistake. You can undo straight after.</p>';
-    if (!rows.length) return h + '<div class="card empty"><p>Nothing logged yet.</p></div>';
+      '<p class="sub">' + tr('Newest first. Tap the bin to delete something you logged by mistake. You can undo straight after.') + '</p>';
+    if (!rows.length) return h + '<div class="card empty"><p>' + tr('Nothing logged yet.') + '</p></div>';
     return h + rows.map(function (r) {
       var title, detail, when, note = '', key;
-      if (r.type === 'period') { title = 'Period started'; detail = ''; when = shortDate(r.date); key = 'data-act="delPeriod" data-d="' + r.date + '"'; }
+      if (r.type === 'period') { title = tr('Period started'); detail = ''; when = shortDate(r.date); key = 'data-act="delPeriod" data-d="' + r.date + '"'; }
       else {
         var d = describeEntry(r.e); title = d.title; detail = d.detail; note = r.e.note || '';
         when = whenText({ start: r.e.start, end: r.e.end, ongoing: !r.e.end }); key = 'data-act="delEntry" data-id="' + r.e.id + '"';
       }
       return '<div class="hist"><div class="hist-main"><b>' + esc(title) + '</b><small>' + esc(when + (detail ? ' · ' + detail : '')) + '</small>' + (note ? '<em>' + esc(note) + '</em>' : '') + '</div>' +
-        '<button class="hist-del" ' + key + ' aria-label="Delete ' + esc(title) + ' from ' + esc(when) + '">' + icon('trash') + '</button></div>';
+        '<button class="hist-del" ' + key + ' aria-label="' + esc(tr('Delete {title} from {when}', { title: title, when: when })) + '">' + icon('trash') + '</button></div>';
     }).join('');
   }
 
@@ -829,6 +848,22 @@
     11: { veg: ['kale', 'Brussels sprouts', 'pumpkin', 'red cabbage', 'white cabbage', 'savoy cabbage', 'leek', 'celeriac', 'parsnip', 'beetroot', 'carrot', 'chicory', 'salsify', "lamb's lettuce", 'onion', 'cauliflower'], fruit: ['apple', 'pear'] },
     12: { veg: ['kale', 'Brussels sprouts', 'pumpkin', 'red cabbage', 'white cabbage', 'savoy cabbage', 'leek', 'celeriac', 'parsnip', 'beetroot', 'carrot', 'chicory', 'salsify', "lamb's lettuce", 'onion'], fruit: ['apple', 'pear'] }
   };
+  /* Italian seasonal produce, used when the language is Italian. */
+  var SEASON_IT = {
+    1: { veg: ['cauliflower', 'broccoli', 'kale', 'savoy cabbage', 'red cabbage', 'white cabbage', 'fennel', 'carrot', 'radicchio', 'chicory', 'spinach', 'chard', 'leek', 'celery', 'pumpkin', 'beetroot', 'cardoon'], fruit: ['orange', 'mandarin', 'clementine', 'lemon', 'grapefruit', 'kiwi', 'apple', 'pear'] },
+    2: { veg: ['cauliflower', 'broccoli', 'kale', 'savoy cabbage', 'fennel', 'carrot', 'radicchio', 'chicory', 'spinach', 'chard', 'leek', 'celery', 'artichoke', 'beetroot', 'cardoon'], fruit: ['orange', 'blood orange', 'mandarin', 'clementine', 'lemon', 'grapefruit', 'kiwi', 'apple', 'pear'] },
+    3: { veg: ['artichoke', 'spinach', 'chard', 'fennel', 'radicchio', 'leek', 'carrot', 'cauliflower', 'broccoli', 'green asparagus', 'peas', 'lettuce', 'spring onion', 'radish'], fruit: ['orange', 'blood orange', 'lemon', 'grapefruit', 'kiwi', 'apple', 'pear'] },
+    4: { veg: ['green asparagus', 'artichoke', 'peas', 'broad beans', 'spinach', 'chard', 'lettuce', 'radish', 'spring onion', 'fennel', 'carrot', 'new potatoes'], fruit: ['strawberry', 'loquat', 'orange', 'lemon', 'kiwi', 'apple'] },
+    5: { veg: ['green asparagus', 'artichoke', 'peas', 'broad beans', 'courgette', 'lettuce', 'radish', 'spring onion', 'spinach', 'chard', 'fennel', 'new potatoes', 'cucumber'], fruit: ['strawberry', 'cherry', 'apricot', 'loquat'] },
+    6: { veg: ['courgette', 'tomato', 'cucumber', 'bell pepper', 'aubergine', 'green beans', 'peas', 'lettuce', 'carrot', 'fennel', 'new potatoes', 'chard', 'spring onion'], fruit: ['cherry', 'apricot', 'peach', 'nectarine', 'strawberry', 'watermelon', 'melon', 'plum', 'raspberry', 'blueberry'] },
+    7: { veg: ['tomato', 'courgette', 'aubergine', 'bell pepper', 'cucumber', 'green beans', 'lettuce', 'carrot', 'chard', 'sweetcorn', 'onion'], fruit: ['peach', 'nectarine', 'apricot', 'watermelon', 'melon', 'plum', 'fig', 'blackberry', 'blueberry', 'raspberry', 'grapes'] },
+    8: { veg: ['tomato', 'aubergine', 'bell pepper', 'courgette', 'cucumber', 'green beans', 'sweetcorn', 'carrot', 'lettuce', 'chard', 'onion'], fruit: ['peach', 'nectarine', 'watermelon', 'melon', 'fig', 'plum', 'grapes', 'blackberry', 'pear'] },
+    9: { veg: ['tomato', 'aubergine', 'bell pepper', 'pumpkin', 'green beans', 'courgette', 'fennel', 'chard', 'spinach', 'carrot', 'celery', 'sweetcorn', 'broccoli', 'cauliflower'], fruit: ['grapes', 'fig', 'apple', 'pear', 'plum', 'melon', 'peach', 'pomegranate', 'blackberry'] },
+    10: { veg: ['pumpkin', 'cauliflower', 'broccoli', 'fennel', 'chard', 'spinach', 'radicchio', 'chicory', 'savoy cabbage', 'kale', 'celery', 'carrot', 'beetroot', 'leek'], fruit: ['apple', 'pear', 'grapes', 'pomegranate', 'persimmon', 'chestnut', 'quince', 'kiwi', 'fig'] },
+    11: { veg: ['pumpkin', 'cauliflower', 'broccoli', 'fennel', 'chard', 'spinach', 'radicchio', 'chicory', 'savoy cabbage', 'kale', 'celery', 'carrot', 'beetroot', 'leek', 'cardoon', 'white cabbage', 'red cabbage'], fruit: ['apple', 'pear', 'persimmon', 'kiwi', 'pomegranate', 'clementine', 'mandarin', 'orange', 'chestnut', 'quince'] },
+    12: { veg: ['cauliflower', 'broccoli', 'kale', 'savoy cabbage', 'red cabbage', 'white cabbage', 'fennel', 'carrot', 'radicchio', 'chicory', 'spinach', 'chard', 'leek', 'celery', 'pumpkin', 'beetroot', 'cardoon'], fruit: ['orange', 'mandarin', 'clementine', 'lemon', 'kiwi', 'apple', 'pear', 'persimmon', 'pomegranate', 'chestnut'] }
+  };
+  var IMPORT_IT = ['banana', 'pineapple', 'mango', 'avocado'];
 var IMPORT = {
   1: ['clementine', 'orange', 'lemon', 'grapefruit', 'kiwi', 'pomegranate', 'persimmon'],
   2: ['clementine', 'orange', 'lemon', 'grapefruit', 'kiwi', 'blood orange'],
@@ -843,23 +878,22 @@ var IMPORT = {
   11: ['clementine', 'orange', 'lemon', 'kiwi', 'pomegranate', 'persimmon'],
   12: ['clementine', 'orange', 'lemon', 'grapefruit', 'kiwi', 'pomegranate', 'persimmon']
 };
-  var MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   var EAT_PHASE = {
     period: {
       why: 'You lose iron with your flow. Pair iron-rich greens with something vitamin C-rich so you absorb more of it. Warm, cooked meals often feel best.',
-      foods: ['spinach', 'kale', 'beetroot', "lamb's lettuce", 'broccoli', 'Brussels sprouts', 'sorrel', 'peas', 'broad beans', 'strawberry', 'bell pepper', 'blackcurrant', 'redcurrant', 'cabbage', 'orange', 'kiwi', 'clementine', 'grapefruit', 'lemon']
+      foods: ['spinach', 'kale', 'beetroot', "lamb's lettuce", 'broccoli', 'Brussels sprouts', 'sorrel', 'peas', 'broad beans', 'strawberry', 'bell pepper', 'blackcurrant', 'redcurrant', 'cabbage', 'orange', 'kiwi', 'clementine', 'grapefruit', 'lemon', 'chard', 'mandarin']
     },
     follicular: {
       why: 'Energy is building. Fresh, light, crunchy food works well, with some protein to go with it.',
-      foods: ['white asparagus', 'green asparagus', 'radish', 'spinach', 'lettuce', 'spring onion', 'peas', 'broccoli', 'cauliflower', 'cucumber', 'kohlrabi', 'rhubarb', 'strawberry', 'fennel', 'sorrel']
+      foods: ['white asparagus', 'green asparagus', 'radish', 'spinach', 'lettuce', 'spring onion', 'peas', 'broccoli', 'cauliflower', 'cucumber', 'kohlrabi', 'rhubarb', 'strawberry', 'fennel', 'sorrel', 'artichoke', 'chard']
     },
     ovulation: {
       why: 'Fibre, colour and plenty of water. Berries, tomatoes and veg with lots of antioxidants are a good fit.',
-      foods: ['tomato', 'courgette', 'bell pepper', 'fennel', 'cucumber', 'raspberry', 'blueberry', 'strawberry', 'blackberry', 'cherry', 'broccoli', 'cauliflower', 'green beans', 'lettuce', 'radish']
+      foods: ['tomato', 'courgette', 'bell pepper', 'fennel', 'cucumber', 'raspberry', 'blueberry', 'strawberry', 'blackberry', 'cherry', 'broccoli', 'cauliflower', 'green beans', 'lettuce', 'radish', 'apricot', 'peach', 'nectarine', 'watermelon']
     },
     luteal: {
       why: 'Your body burns a bit more energy now, so regular meals with some slow carbs, fibre and magnesium help keep mood and cravings steadier. Try not to skip meals.',
-      foods: ['pumpkin', 'sweetcorn', 'spinach', 'kale', 'parsnip', 'carrot', 'beetroot', 'leek', 'celeriac', 'savoy cabbage', 'red cabbage', 'white cabbage', 'cauliflower', 'broccoli', 'apple', 'pear', 'plum', 'new potatoes']
+      foods: ['pumpkin', 'sweetcorn', 'spinach', 'kale', 'parsnip', 'carrot', 'beetroot', 'leek', 'celeriac', 'savoy cabbage', 'red cabbage', 'white cabbage', 'cauliflower', 'broccoli', 'apple', 'pear', 'plum', 'new potatoes', 'chestnut', 'chard', 'fennel', 'celery']
     }
   };
   var GUT_FOODS = ['carrot', 'pumpkin', 'courgette', 'parsnip', 'cucumber', 'blueberry', 'strawberry', 'spinach', 'new potatoes', 'sweetcorn'];
@@ -868,37 +902,38 @@ var IMPORT = {
       spinach: 'Iron, folate', kale: 'Iron, vitamin C', beetroot: 'Iron, folate', "lamb's lettuce": 'Iron, vitamin C', broccoli: 'Iron, vitamin C',
       'Brussels sprouts': 'Vitamin C, iron', sorrel: 'Iron', peas: 'Plant iron, protein', 'broad beans': 'Plant iron, protein', strawberry: 'Vitamin C',
       'bell pepper': 'Vitamin C', blackcurrant: 'Vitamin C', redcurrant: 'Vitamin C', cabbage: 'Vitamin C, fibre',
-      orange: 'Vitamin C', kiwi: 'Vitamin C', clementine: 'Vitamin C', grapefruit: 'Vitamin C', lemon: 'Vitamin C'
+      orange: 'Vitamin C', kiwi: 'Vitamin C', clementine: 'Vitamin C', grapefruit: 'Vitamin C', lemon: 'Vitamin C', chard: 'Iron, folate', mandarin: 'Vitamin C'
     },
     follicular: {
       'white asparagus': 'Light, folate', 'green asparagus': 'Light, folate', radish: 'Fresh, vitamin C', spinach: 'Folate, iron',
       lettuce: 'Light, hydrating', 'spring onion': 'Light, fresh', peas: 'Protein, fibre', broccoli: 'Fibre, folate',
       cauliflower: 'Fibre, vitamin C', cucumber: 'Hydrating', kohlrabi: 'Vitamin C', rhubarb: 'Fibre',
-      strawberry: 'Vitamin C', fennel: 'Gentle digestion', sorrel: 'Fresh greens'
+      strawberry: 'Vitamin C', fennel: 'Gentle digestion', sorrel: 'Fresh greens', artichoke: 'Gentle digestion', chard: 'Folate, iron'
     },
     ovulation: {
       tomato: 'Lycopene', courgette: 'Light, fibre', 'bell pepper': 'Antioxidants, vitamin C', fennel: 'Fibre',
       cucumber: 'Hydrating', raspberry: 'Fibre, antioxidants', blueberry: 'Fibre, antioxidants', strawberry: 'Antioxidants, vitamin C', blackberry: 'Fibre, antioxidants',
-      cherry: 'Antioxidants', broccoli: 'Fibre, vitamin C', cauliflower: 'Fibre', 'green beans': 'Fibre', lettuce: 'Water-rich', radish: 'Water-rich'
+      cherry: 'Antioxidants', broccoli: 'Fibre, vitamin C', cauliflower: 'Fibre', 'green beans': 'Fibre', lettuce: 'Water-rich', radish: 'Water-rich', apricot: 'Antioxidants', peach: 'Antioxidants', nectarine: 'Antioxidants', watermelon: 'Hydrating'
     },
     luteal: {
       pumpkin: 'Slow carbs, magnesium', sweetcorn: 'Slow carbs', spinach: 'Magnesium, iron', kale: 'Magnesium, calcium',
       parsnip: 'Slow carbs, fibre', carrot: 'Fibre', beetroot: 'Fibre, iron', leek: 'Gentle fibre', celeriac: 'Fibre',
       cabbage: 'Fibre', cauliflower: 'Fibre, B vitamins', broccoli: 'Fibre, B vitamins', apple: 'Fibre', pear: 'Fibre',
-      plum: 'Fibre', 'new potatoes': 'Slow carbs'
+      plum: 'Fibre', 'new potatoes': 'Slow carbs', chestnut: 'Slow carbs, fibre', chard: 'Magnesium, iron', fennel: 'Gentle digestion', celery: 'Fibre'
     }
   };
   
 function whyFor(phase, n) {
     var w = EAT_WHY[phase] || {};
-    if (w[n]) return w[n];
-    for (var k in w) { if (k.length > 4 && n.indexOf(k) !== -1) return w[k]; }
+    if (w[n]) return tr(w[n]);
+    for (var k in w) { if (k.length > 4 && n.indexOf(k) !== -1) return tr(w[k]); }
     return '';
   }
+  function tl(s) { return tr(s); }
   function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
   function pills(list, cls, hi) {
     return '<div class="chips">' + list.map(function (n) {
-      return '<span class="chip pr ' + cls + (hi && hi.indexOf(n) !== -1 ? ' hi' : '') + '">' + esc(cap(n)) + '</span>';
+      return '<span class="chip pr ' + cls + (hi && hi.indexOf(n) !== -1 ? ' hi' : '') + '">' + esc(cap(tr(n))) + '</span>';
     }).join('') + '</div>';
   }
   function recentGut() {
@@ -909,37 +944,37 @@ function whyFor(phase, n) {
     });
   }
   function viewEat() {
-    var nowM = new Date().getMonth() + 1, m = nowM, S = SEASON[m];
+    var nowM = new Date().getMonth() + 1, m = nowM, itl = lang === 'it', S = (itl ? SEASON_IT : SEASON)[m], IMP = itl ? IMPORT_IT : IMPORT[m];
     var info = cycleInfo(todayIso());
-    var h = '<div class="banner"><div><small>Grown in the Netherlands</small><h1>Eat</h1></div></div>';
-    var all = S.veg.concat(S.fruit, VEG_ALL, IMPORT[m]);
+    var h = '<div class="banner"><div><small>' + tr(itl ? 'Grown in Italy' : 'Grown in the Netherlands') + '</small><h1>' + tr('Eat') + '</h1></div></div>';
+    var all = S.veg.concat(S.fruit, VEG_ALL, IMP);
     var fp = null;
     if (info) {
       fp = EAT_PHASE[info.phase];
       var match = all.filter(function (n) { return fp.foods.indexOf(n) !== -1 || fp.foods.some(function (f) { return n.indexOf(f) !== -1 && f.length > 4; }); });
-      h += '<section class="card"><h2>For your ' + PHASES[info.phase].label.toLowerCase() + ' phase</h2><p>' + esc(fp.why) + '</p>';
-      h += match.length ? '<p class="muted" style="margin:10px 0 8px">In season in ' + MONTH_NAMES[m - 1] + ' and a good fit:</p>' + '<div class="why-list">' + (ui.eatMore ? match : match.slice(0, 6)).map(function (n) { return '<div class="why-row"><b>' + esc(cap(n)) + '</b><span>' + esc(whyFor(info.phase, n)) + '</span></div>'; }).join('') + '</div>' + (match.length > 6 ? '<button class="more" data-act="eatMore">' + (ui.eatMore ? 'Show less' : 'Show ' + (match.length - 6) + ' more') + '</button>' : '') : '<p class="muted" style="margin-top:8px">Nothing on the list below is a standout for this phase this month, so just eat what you enjoy.</p>';
+      h += '<section class="card"><h2>' + tr('For your {phase}', { phase: pt(info.phase).toLowerCase() }) + '</h2><p>' + esc(tr(fp.why)) + '</p>';
+      h += match.length ? '<p class="muted" style="margin:10px 0 8px">' + tr('In season in {m} and a good fit:', { m: MONTHS[m - 1] }) + '</p>' + '<div class="why-list">' + (ui.eatMore ? match : match.slice(0, 6)).map(function (n) { return '<div class="why-row"><b>' + esc(cap(tr(n))) + '</b><span>' + esc(whyFor(info.phase, n)) + '</span></div>'; }).join('') + '</div>' + (match.length > 6 ? '<button class="more" data-act="eatMore">' + (ui.eatMore ? tr('Show less') : tr('Show {n} more', { n: match.length - 6 })) + '</button>' : '') : '<p class="muted" style="margin-top:8px">' + tr('Nothing on the list below is a standout for this phase this month, so just eat what you enjoy.') + '</p>';
       h += '</section>';
     }
     if (recentGut()) {
       var gm = all.filter(function (n) { return GUT_FOODS.indexOf(n) !== -1; });
-      if (gm.length) h += '<section class="card"><h2>If your tummy is touchy</h2><p>You logged gut or poo notes recently. Cooked veg is usually gentler than raw, and these are in season and mild:</p><div style="height:8px"></div>' + pills(gm, 'mild') + '</section>';
+      if (gm.length) h += '<section class="card"><h2>' + tr('If your tummy is touchy') + '</h2><p>' + tr('You logged gut or poo notes recently. Cooked veg is usually gentler than raw, and these are in season and mild:') + '</p><div style="height:8px"></div>' + pills(gm, 'mild') + '</section>';
     }
-    h += '<section class="card"><h2>Vegetables in ' + MONTH_NAMES[m - 1] + '</h2>' + pills(S.veg.concat(VEG_ALL), 'veg', fp ? fp.foods : null) + '</section>';
-    h += '<section class="card"><h2>Fruit in ' + MONTH_NAMES[m - 1] + '</h2>' + pills(S.fruit, 'fruit', fp ? fp.foods : null) + '</section>';
-    h += '<section class="card"><h2>Imported fruit in ' + MONTH_NAMES[m - 1] + '</h2><p class="muted" style="margin-bottom:8px">Not grown here, but in season in southern Europe and elsewhere.</p>' + pills(IMPORT[m], 'import', fp ? fp.foods : null) + '</section>';
-    h += '<p class="quiet" style="margin-top:8px">A general guide to Dutch-grown seasonal produce. Dates vary a little by year and by greenhouse. Not medical or dietary advice.</p>';
+    h += '<section class="card"><h2>' + tr('Vegetables in {m}', { m: MONTHS[m - 1] }) + '</h2>' + pills(S.veg.concat(VEG_ALL), 'veg', fp ? fp.foods : null) + '</section>';
+    h += '<section class="card"><h2>' + tr('Fruit in {m}', { m: MONTHS[m - 1] }) + '</h2>' + pills(S.fruit, 'fruit', fp ? fp.foods : null) + '</section>';
+    h += '<section class="card"><h2>' + tr('Imported fruit in {m}', { m: MONTHS[m - 1] }) + '</h2><p class="muted" style="margin-bottom:8px">' + tr(itl ? 'Not grown in Italy, or only in small amounts, so it is imported.' : 'Not grown here, but in season in southern Europe and elsewhere.') + '</p>' + pills(IMP, 'import', fp ? fp.foods : null) + '</section>';
+    h += '<p class="quiet" style="margin-top:8px">' + tr(itl ? 'A general guide to Italian seasonal produce. Dates vary a little by year and by region. Not medical or dietary advice.' : 'A general guide to Dutch-grown seasonal produce. Dates vary a little by year and by greenhouse. Not medical or dietary advice.') + '</p>';
     return h + navBar('eat');
   }
 
 function viewLearn() {
   var info = cycleInfo(todayIso());
   var key = info ? info.phase : 'luteal', T = PHASE_TEXT[key], ph = PHASES[key];
-  var h = banner(ui.learnKind === 'going' ? 'More on what’s going on' : 'More on what to do', ph.label + ' phase', 'today');
-  if (ui.learnKind === 'going') h += '<section class="card"><h2>You may notice</h2><div class="chips">' + T.notice.map(function (n) { return '<span class="chip">' + esc(n) + '</span>'; }).join('') + '</div></section>';
+  var h = banner(ui.learnKind === 'going' ? 'More on what’s going on' : 'More on what to do', pt(key), 'today');
+  if (ui.learnKind === 'going') h += '<section class="card"><h2>' + tr('You may notice') + '</h2><div class="chips">' + T.notice.map(function (n) { return '<span class="chip">' + esc(tr(n)) + '</span>'; }).join('') + '</div></section>';
   if (T.know) {
     T.know.filter(function (g) { return (g[0] === 'Body') === (ui.learnKind === 'going'); }).forEach(function (g) {
-      h += '<section class="card">' + (g[0] === 'Body' ? '' : '<span class="tag ' + g[0] + ' grp">' + g[0] + '</span>') + '<ul class="know">' + g[1].map(function (k) { return '<li>' + esc(k) + '</li>'; }).join('') + '</ul></section>';
+      h += '<section class="card">' + (g[0] === 'Body' ? '' : '<span class="tag ' + g[0] + ' grp">' + tr(g[0]) + '</span>') + '<ul class="know">' + g[1].map(function (k) { return '<li>' + esc(tr(k)) + '</li>'; }).join('') + '</ul></section>';
     });
   }
   return h + navBar('today');
@@ -971,43 +1006,43 @@ function viewLearn() {
       var delim = line.indexOf('\t') > -1 ? '\t' : line.indexOf(';') > -1 ? ';' : ',';
       var p = line.split(delim).map(function (x) { return x.trim().replace(/^"(.*)"$/, '$1'); });
       if (/^date$/i.test(p[0])) return;
-      var L = 'Line ' + (idx + 1) + ': ';
+      var L = tr('Line {n}: ', { n: idx + 1 });
       var date = looseDate(p[0]);
-      if (!date) { out.errors.push(L + 'could not read the date "' + p[0] + '". Use a full date like 2025-10-12 or 12/10/2025.'); return; }
-      if (date > today) { out.errors.push(L + 'that date is in the future.'); return; }
+      if (!date) { out.errors.push(L + tr('could not read the date "{d}". Use a full date like 2025-10-12 or 12/10/2025.', { d: p[0] })); return; }
+      if (date > today) { out.errors.push(L + tr('that date is in the future.')); return; }
       var what = (p[1] || '').trim();
-      if (!what) { out.errors.push(L + 'add what it was after the date.'); return; }
+      if (!what) { out.errors.push(L + tr('add what it was after the date.')); return; }
       var rating = (p[2] || '').trim(), note = p.slice(3).join(delim).trim();
       var low = what.toLowerCase(), kind, issue = null, name = null;
-      if (/^(period|periods|menstruation|menses)( start(ed)?)?$/.test(low)) kind = 'period';
-      else if (/^(poo|poop|pooping|bowel movement|bm|stool|bristol)/.test(low)) { kind = 'poop'; issue = issueById('poop'); }
+      if (/^(period|periods|menstruation|menses|ciclo|mestruazioni|mestruazione)( start(ed)?| iniziato)?$/.test(low)) kind = 'period';
+      else if (/^(poo|poop|pooping|bowel movement|bm|stool|bristol|cacca|feci)/.test(low)) { kind = 'poop'; issue = issueById('poop'); }
       else {
-        issue = db.issues.filter(function (i) { return i.kind !== 'period' && i.kind !== 'poop' && i.name.toLowerCase() === low; })[0] ||
-          db.issues.filter(function (i) { var n = i.name.toLowerCase(); return i.kind !== 'period' && i.kind !== 'poop' && (n.indexOf(low) !== -1 || low.indexOf(n) !== -1); })[0];
+        issue = db.issues.filter(function (i) { return i.kind !== 'period' && i.kind !== 'poop' && (i.name.toLowerCase() === low || iname(i).toLowerCase() === low); })[0] ||
+          db.issues.filter(function (i) { var n = i.name.toLowerCase(), n2 = iname(i).toLowerCase(); return i.kind !== 'period' && i.kind !== 'poop' && (n.indexOf(low) !== -1 || low.indexOf(n) !== -1 || n2.indexOf(low) !== -1 || low.indexOf(n2) !== -1); })[0];
         if (issue) kind = issue.kind; else { kind = 'custom'; name = what.charAt(0).toUpperCase() + what.slice(1); }
       }
-      var row = { date: date, kind: kind, issueId: issue ? issue.id : null, name: name, note: note, label: issue ? issue.name : name || 'Period started' };
+      var row = { date: date, kind: kind, issueId: issue ? issue.id : null, name: name, note: note, label: issue ? iname(issue) : name || tr('Period started') };
       var key;
       if (kind === 'period') {
         key = 'period|' + date;
         if (seen[key] || db.periodStarts.indexOf(date) !== -1) { out.skipped++; return; }
-        row.label = 'Period started';
+        row.label = tr('Period started');
       } else if (kind === 'poop') {
         key = 'poop|' + date;
-        if (/^(none|no|nothing|didn.?t.*|0)$/i.test(rating)) { row.noPoo = true; row.detail = 'Didn’t poo'; }
+        if (/^(none|no|nothing|didn.?t.*|0|nessuna|niente|non.*)$/i.test(rating)) { row.noPoo = true; row.detail = tr('Didn’t poo'); }
         else {
           var b = parseInt(rating, 10);
-          if (!(b >= 1 && b <= 7)) { out.errors.push(L + 'for poo, write the type 1 to 7 (Bristol) or "none".'); return; }
-          row.bristol = b; row.detail = 'Type ' + b;
+          if (!(b >= 1 && b <= 7)) { out.errors.push(L + tr('for poo, write the type 1 to 7 (Bristol) or "none".')); return; }
+          row.bristol = b; row.detail = tr('Type {n}', { n: b });
         }
-        row.label = 'Poo tracker';
+        row.label = tr('Poo tracker');
         if (seen[key] || db.entries.some(function (e) { return e.issueId === 'poop' && e.start === date; })) { out.skipped++; return; }
       } else {
         key = (issue ? issue.id : 'new:' + low) + '|' + date;
-        if (rating === '') { row.strength = 5; out.noRating++; row.detail = 'no rating (set to 5)'; }
+        if (rating === '') { row.strength = 5; out.noRating++; row.detail = tr('no rating (set to 5)'); }
         else {
           var n = parseFloat(rating.replace(',', '.'));
-          if (isNaN(n) || n < 0 || n > 10) { out.errors.push(L + 'the rating must be a number from 0 to 10.'); return; }
+          if (isNaN(n) || n < 0 || n > 10) { out.errors.push(L + tr('the rating must be a number from 0 to 10.')); return; }
           row.strength = Math.round(n); row.detail = row.strength + '/10';
         }
         if (seen[key] || (issue && db.entries.some(function (e) { return e.issueId === issue.id && e.start === date; }))) { out.skipped++; return; }
@@ -1063,20 +1098,20 @@ function viewLearn() {
   function viewImportNotes() {
     var r = ui.imp;
     var h = banner('Settings', 'Import data', 'settings') +
-      '<button class="btn secondary" data-act="copyPrompt">Copy a prompt for an AI</button>' +
-      '<label class="btn secondary" style="display:block;text-align:center;cursor:pointer">Choose a file<input type="file" id="notesFile" accept=".txt,.csv,.tsv,text/plain,text/csv" style="display:none"></label>' +
-      '<button class="btn secondary" data-act="import">Restore from backup</button>';
+      '<button class="btn secondary" data-act="copyPrompt">' + tr('Copy a prompt for an AI') + '</button>' +
+      '<label class="btn secondary" style="display:block;text-align:center;cursor:pointer">' + tr('Choose a file') + '<input type="file" id="notesFile" accept=".txt,.csv,.tsv,text/plain,text/csv" style="display:none"></label>' +
+      '<button class="btn secondary" data-act="import">' + tr('Restore from backup') + '</button>';
     if (r) {
-      h += '<div class="card" style="margin-top:14px"><h2>' + (r.rows.length ? r.rows.length + ' ' + (r.rows.length === 1 ? 'entry' : 'entries') + ' ready to import' : 'Nothing to import yet') + '</h2>';
+      h += '<div class="card" style="margin-top:14px"><h2>' + (r.rows.length ? tn('{n} entry ready to import', '{n} entries ready to import', r.rows.length) : tr('Nothing to import yet')) + '</h2>';
       if (r.rows.length) {
         h += '<div class="hist">' + r.rows.slice(0, 8).map(function (x) { return '<div class="note-item"><small>' + shortDate(x.date) + '</small>' + esc(x.label) + (x.detail ? ' · ' + esc(x.detail) : '') + '</div>'; }).join('') + '</div>';
-        if (r.rows.length > 8) h += '<p class="muted">and ' + (r.rows.length - 8) + ' more</p>';
+        if (r.rows.length > 8) h += '<p class="muted">' + tr('and {n} more', { n: r.rows.length - 8 }) + '</p>';
       }
-      if (r.newIssues.length) h += '<p class="muted" style="margin-top:8px">New issues will be added: ' + esc(r.newIssues.join(', ')) + '</p>';
-      if (r.skipped) h += '<p class="muted" style="margin-top:8px">' + r.skipped + ' skipped because you already have them.</p>';
-      if (r.errors.length) h += '<p style="margin-top:10px;color:#B3362A;font-weight:700">' + r.errors.length + ' ' + (r.errors.length === 1 ? 'line' : 'lines') + ' could not be read:</p><ul class="know">' + r.errors.slice(0, 8).map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' + (r.errors.length > 8 ? '<p class="muted">and ' + (r.errors.length - 8) + ' more</p>' : '');
+      if (r.newIssues.length) h += '<p class="muted" style="margin-top:8px">' + tr('New issues will be added: ') + esc(r.newIssues.join(', ')) + '</p>';
+      if (r.skipped) h += '<p class="muted" style="margin-top:8px">' + tr('{n} skipped because you already have them.', { n: r.skipped }) + '</p>';
+      if (r.errors.length) h += '<p style="margin-top:10px;color:#B3362A;font-weight:700">' + tn('{n} line could not be read:', '{n} lines could not be read:', r.errors.length) + '</p><ul class="know">' + r.errors.slice(0, 8).map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' + (r.errors.length > 8 ? '<p class="muted">' + tr('and {n} more', { n: r.errors.length - 8 }) + '</p>' : '');
       h += '</div>';
-      if (r.rows.length) h += '<button class="btn" data-act="impGo">Import ' + r.rows.length + ' ' + (r.rows.length === 1 ? 'entry' : 'entries') + '</button>';
+      if (r.rows.length) h += '<button class="btn" data-act="impGo">' + tn('Import {n} entry', 'Import {n} entries', r.rows.length) + '</button>';
     }
     return h;
   }
@@ -1100,9 +1135,9 @@ function viewLearn() {
 
   /* ---------- Actions ---------- */
   function addPeriodStart(dateIso, withUndo) {
-    if (db.periodStarts.indexOf(dateIso) !== -1) { toast('A period start is already logged for that day.'); return false; }
+    if (db.periodStarts.indexOf(dateIso) !== -1) { toast(tr('A period start is already logged for that day.')); return false; }
     db.periodStarts.push(dateIso); db.periodStarts.sort(); save();
-    toast('Period start logged for ' + shortDate(dateIso), withUndo ? function () {
+    toast(tr('Period start logged for {d}', { d: shortDate(dateIso) }), withUndo ? function () {
       db.periodStarts = db.periodStarts.filter(function (s) { return s !== dateIso; }); save(); render();
     } : null);
     return true;
@@ -1114,16 +1149,16 @@ function viewLearn() {
 
   var actions = {
     copyPrompt: function () {
-      var done = function () { toast('Prompt copied. Paste it into an AI, then add your notes.'); };
-      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(AI_PROMPT).then(done, function () { window.prompt('Copy this prompt:', AI_PROMPT); });
-      else window.prompt('Copy this prompt:', AI_PROMPT);
+      var done = function () { toast(tr('Prompt copied. Paste it into an AI, then add your notes.')); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(AI_PROMPT).then(done, function () { window.prompt(tr('Copy this prompt:'), AI_PROMPT); });
+      else window.prompt(tr('Copy this prompt:'), AI_PROMPT);
     },
     importNotes: function () { ui.imp = null; ui.impText = ""; go("importNotes"); },
     eatMore: function () { ui.eatMore = !ui.eatMore; render(); },
 impGo: function () {
   var r = ui.imp; if (!r || !r.rows.length) return;
   var undo = commitNotes(r.rows), n = r.rows.length;
-  ui.imp = null; ui.impText = ""; go("today"); toast(n + (n === 1 ? " entry" : " entries") + " imported", undo);
+  ui.imp = null; ui.impText = ""; go("today"); toast(tn('{n} entry imported', '{n} entries imported', n), undo);
 },
     hormones: function () { ui.hSel = null; go('hormones'); },
     moonDay: function (el) {
@@ -1149,7 +1184,7 @@ impGo: function () {
     go: function (el) { go(el.getAttribute('data-v')); },
     firstStart: function () {
       var v = document.getElementById('firstStart').value;
-      if (!v || v > todayIso()) { toast('Pick a date that is today or earlier.'); return; }
+      if (!v || v > todayIso()) { toast(tr('Pick a date that is today or earlier.')); return; }
       db.periodStarts.push(v); save(); render();
     },
     pick: function (el) {
@@ -1164,7 +1199,7 @@ impGo: function () {
       } else if (issue.kind === 'tap') {
         var e = { id: uid(), issueId: issue.id, start: todayIso(), end: todayIso(), level: 2, note: '' };
         db.entries.push(e); save(); go('today');
-        toast(issue.name + ' logged for today', function () { db.entries = db.entries.filter(function (x) { return x.id !== e.id; }); save(); render(); });
+        toast(tr('{name} logged for today', { name: iname(issue) }), function () { db.entries = db.entries.filter(function (x) { return x.id !== e.id; }); save(); render(); });
       } else {
         go('issue', { draft: newDraft(issue) });
       }
@@ -1188,30 +1223,30 @@ impGo: function () {
       var d = ui.draft, issue = issueById(d.issueId);
       var e = { id: uid(), issueId: issue.id, start: d.start, end: d.ongoing ? null : (d.end || d.start), level: levelFor(issue, d), note: (d.note || '').trim() };
       if (d.where) e.where = d.where;
-      if (issue.kind === 'gut' && !d.symptoms.length) { toast('Pick at least one symptom.'); return; }
+      if (issue.kind === 'gut' && !d.symptoms.length) { toast(tr('Pick at least one symptom.')); return; }
       if (issue.kind === 'pain' || issue.kind === 'custom' || issue.kind === 'gut') { e.strength = d.strength; e.scale = 10; }
       if (issue.kind === 'gut') e.symptoms = d.symptoms.slice();
       if (issue.kind === 'bloat') e.bloat = d.bloat;
       if (issue.kind === 'poop') { if (d.noPoo) e.noPoo = true; else e.bristol = d.bristol; }
       db.entries.push(e); save(); go('today');
-      toast(issue.name + ' saved', function () { db.entries = db.entries.filter(function (x) { return x.id !== e.id; }); save(); render(); });
+      toast(tr('{name} saved', { name: iname(issue) }), function () { db.entries = db.entries.filter(function (x) { return x.id !== e.id; }); save(); render(); });
     },
     history: function (el) { go('history', { histFrom: el.getAttribute('data-from') || 'patterns' }); },
     delEntry: function (el) {
       var id = el.getAttribute('data-id'), e = db.entries.filter(function (x) { return x.id === id; })[0];
       if (!e) return;
       db.entries = db.entries.filter(function (x) { return x.id !== id; }); save(); render();
-      toast('Entry deleted', function () { db.entries.push(e); save(); render(); });
+      toast(tr('Entry deleted'), function () { db.entries.push(e); save(); render(); });
     },
     delPeriod: function (el) {
       var d = el.getAttribute('data-d');
       db.periodStarts = db.periodStarts.filter(function (s) { return s !== d; }); save(); render();
-      toast('Period start deleted', function () { db.periodStarts.push(d); db.periodStarts.sort(); save(); render(); });
+      toast(tr('Period start deleted'), function () { db.periodStarts.push(d); db.periodStarts.sort(); save(); render(); });
     },
     addPreset: function (el) {
       var p = PRESETS.filter(function (x) { return x.id === el.getAttribute('data-id'); })[0];
       if (!p || issueById(p.id)) return;
-      db.issues.push(JSON.parse(JSON.stringify(p))); save(); go('log'); toast(p.name + ' added');
+      db.issues.push(JSON.parse(JSON.stringify(p))); save(); go('log'); toast(tr('{name} added', { name: tr(p.name) }));
     },
     noPoo: function () { ui.draft.noPoo = !ui.draft.noPoo; render(); },
     symptom: function (el) {
@@ -1222,7 +1257,7 @@ impGo: function () {
     tile: function (el) { ui.draft.tileIdx = +el.getAttribute('data-n'); render(); var n = document.querySelector('[data-input=name]'); },
     saveIssue: function () {
       var name = (ui.draft.name || '').trim();
-      if (!name) { toast('Give it a name first.'); return; }
+      if (!name) { toast(tr('Give it a name first.')); return; }
       var t = ISSUE_TILES[ui.draft.tileIdx];
       db.issues.push({ id: uid(), name: name, kind: 'custom', icon: t[0], tile: t[1] }); save(); go('log');
     },
@@ -1237,13 +1272,13 @@ impGo: function () {
     bcToggle: function () { ui.bcOpen = !ui.bcOpen; render(); },
     saveLastStart: function () {
       var v = document.getElementById('lastStart').value;
-      if (!v || v > todayIso()) { toast('Pick a date that is today or earlier.'); return; }
+      if (!v || v > todayIso()) { toast(tr('Pick a date that is today or earlier.')); return; }
       var latest = db.periodStarts.slice().sort().pop();
-      if (v === latest) { toast('That is already your last period start.'); return; }
+      if (v === latest) { toast(tr('That is already your last period start.')); return; }
       // Replace the most recent start with the new date (this is a correction, not a new period).
       db.periodStarts = db.periodStarts.filter(function (s) { return s !== latest && s !== v; });
       db.periodStarts.push(v); db.periodStarts.sort(); save();
-      toast('Last period start set to ' + shortDate(v)); render();
+      toast(tr('Last period start set to {d}', { d: shortDate(v) })); render();
     },
     export: function () {
       var blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
@@ -1252,7 +1287,13 @@ impGo: function () {
     },
     import: function () { document.getElementById('importFile').click(); },
     wipe: function () {
-      if (window.confirm('Delete all your data from this device? This cannot be undone.')) { db = defaultDb(); save(); go('today'); toast('All data deleted'); }
+      if (window.confirm(tr('Delete all your data from this device? This cannot be undone.'))) { db = defaultDb(); save(); go('today'); toast(tr('All data deleted')); }
+    },
+    setLang: function (el) {
+      var l = el.getAttribute('data-l');
+      if (l !== 'en' && l !== 'it') return;
+      try { localStorage.setItem(LANG_KEY, l); } catch (e) { /* ignore */ }
+      applyLang(l); render();
     },
     undo: function () { if (toastUndo) { toastUndo(); toastUndo = null; } document.getElementById('toast').className = ''; }
   };
@@ -1268,7 +1309,7 @@ impGo: function () {
       ui.draft.strength = v;
       var bub = document.getElementById('bubble'), lab = document.getElementById('strengthLabel');
       if (bub) { bub.textContent = v; bub.style.setProperty('--v', v); }
-      if (lab) lab.textContent = v === 0 ? 'None' : v <= 3 ? 'Mild' : v <= 6 ? 'Medium' : 'Strong';
+      if (lab) lab.textContent = strengthWord(v);
       return;
     }
     var k = ev.target.getAttribute && ev.target.getAttribute('data-input');
@@ -1288,8 +1329,8 @@ impGo: function () {
       try {
         var s = JSON.parse(r.result);
         if (!(s && s.settings && s.issues && s.entries && s.periodStarts)) throw new Error('bad');
-        if (window.confirm('Replace the data on this device with this backup?')) { db = s; save(); go('today'); toast('Backup restored'); }
-      } catch (e) { toast('That file is not a Body tracker backup.'); }
+        if (window.confirm(tr('Replace the data on this device with this backup?'))) { db = s; save(); go('today'); toast(tr('Backup restored')); }
+      } catch (e) { toast(tr('That file is not a Body tracker backup.')); }
       ev.target.value = '';
     };
     r.readAsText(f);
