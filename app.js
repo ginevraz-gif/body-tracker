@@ -190,12 +190,12 @@
       notice: ['Cramps', 'Lower back ache', 'Tiredness', 'Headache', 'Heavier flow', 'Low mood'],
       know: [
         ['Body', ['The length, heaviness and pain of your period can reflect how the past month went', 'Very painful, heavy or missing periods are worth talking to a doctor about']],
-        ['Eat', ['Iron-rich foods: lentils, red meat, dark leafy greens', 'Anti-inflammatory foods may help']],
+        ['Eat', ['Simple, warm meals with iron and B vitamins feel best', 'Warm drinks, warmth and slow breathing help you settle']],
         ['Sleep', ['Lie down and rest instead of pushing through']],
         ['Mind', ['Good for planning and reflecting: lists, big-picture thinking', 'Do not force social events or presentations']]
       ],
       todo: [
-        ['Eat', 'Iron-rich foods like lentils, eggs and leafy greens, with something vitamin C-rich alongside to help absorption.'],
+        ['Eat', 'Simple, warm meals with iron and B vitamins, like lentils, eggs and leafy greens, plus something vitamin C-rich to help absorption.'],
         ['Move', 'Gentle walks or stretching. Heat on your belly or back can ease cramps.'],
         ['Sleep', 'You may need a little more rest. An earlier night can help.'],
         ['Mind', 'Be kind to yourself. It is fine to say no to extras.'],
@@ -203,15 +203,15 @@
       ]
     },
     follicular: {
-      likely: 'Oestrogen is rising. Energy, focus and mood often pick up, and skin tends to feel calmer.',
+      likely: 'Oestrogen is rising. Energy, mood and clarity often pick up, appetite tends to be lower, and the body copes better with carbohydrates. Skin often looks brighter.',
       notice: ['Rising energy', 'Clearer head', 'Better mood', 'Feeling social'],
       know: [
-        ['Eat', ['Iron-rich foods to replace what you lost: lentils, red meat, dark leafy greens']],
+        ['Eat', ['Complex carbs (wholegrains, oats, legumes) tend to sit well now', 'Bitter greens, artichokes, ginger and turmeric add fibre and flavour and may support digestion', 'Colourful, lighter meals with lean protein (fish, legumes, eggs) suit the higher energy', 'Drink plenty of water, for example with mint or cucumber', 'A good moment to notice how food makes you feel, without judging yourself']],
         ['Move', ['Good time for harder workouts']],
         ['Mind', ['Motivation and clarity tend to rise', 'Good for demanding projects, social plans and learning something new', 'Brainstorming and drafting feel easier']]
       ],
       todo: [
-        ['Eat', 'Fresh, lighter meals with plenty of vegetables, plus protein to rebuild after your period.'],
+        ['Eat', 'Complex carbs like wholegrains and oats, colourful vegetables and light protein such as fish, legumes or eggs. Bitter greens and plenty of water.'],
         ['Move', 'A good time to try something new or push a little harder.'],
         ['Sleep', 'Sleep is often deeper now. Keep a steady bedtime.'],
         ['Mind', 'Good days for learning, starting things and making plans.'],
@@ -219,14 +219,15 @@
       ]
     },
     ovulation: {
-      likely: 'Oestrogen peaks and an egg is released. Many people feel energetic and social. Some notice a one-sided twinge or more discharge.',
+      likely: 'Oestrogen peaks and an egg is released. Many people feel energetic and social. Some notice a one-sided twinge or more discharge. Stress can make this phase feel less smooth, with headache or bloating for some people.',
       notice: ['High energy', 'One-sided twinge', 'More discharge', 'Higher libido'],
       know: [
+        ['Eat', ['Digestion and energy are often at their best, so light but nourishing meals suit you: wholegrains, raw and cooked vegetables, lean protein', 'Beetroot, artichoke, lemon and parsley add fibre and freshness', 'Protein and fibre at breakfast and in snacks help avoid blood sugar spikes and crashes', 'You may want to do everything at once: slow down, chew and eat with attention', 'Noting how you feel before and after meals is easier now, and it is a good time to set new habits']],
         ['Move', ['Intense workouts often feel good']],
         ['Mind', ['Energy and confidence often peak', 'Good for presentations and negotiations', 'Watch for impulsive spending, snacking or decisions', 'Save pitches and social plans for now, not lonely, dull work']]
       ],
       todo: [
-        ['Eat', 'Fibre, fruit and veg, and plenty of water.'],
+        ['Eat', 'Light, nourishing meals with vegetables, wholegrains and lean protein. Protein and fibre at breakfast keep blood sugar steadier.'],
         ['Move', 'Strong, energetic workouts often feel good. Warm up well.'],
         ['Sleep', 'Sleep can be a little lighter. Keep evenings calm.'],
         ['Mind', 'Confidence is often high, so good timing for important conversations.'],
@@ -234,18 +235,18 @@
       ]
     },
     luteal: {
-      likely: 'Progesterone is high, then starts to fall. Energy and mood can dip, sleep gets lighter, and bloating or sore breasts are common.',
+      likely: 'Progesterone rises, then falls before your period. Many people feel calmer and more inward at first, then more sensitive. As hormones fall, irritability, lighter sleep, cravings for carbs or salty food, bloating and fluid retention are common.',
       notice: ['Bloating', 'Sore breasts', 'Cravings', 'Lighter sleep', 'Low energy', 'Irritability'],
       know: [
-        ['Body', ['Early: progesterone rises, so you feel warmer, sleepier and hungrier', 'Digestion slows, so bloating and constipation are common', 'Late: hormones drop before your period, which can feel turbulent', 'You burn a bit more energy and blood sugar is touchier', 'Cardio feels harder than usual', 'Stress tolerance may be lower', 'Low progesterone, often from stress or undereating, can bring anxiety or irritability']],
-        ['Eat', ['Warm meals with slow carbs (sweet potato, oats)', 'Add protein and magnesium-rich foods', 'Pair carbs with protein or fat', 'Eat every 3 to 4 hours, do not skip meals', 'Less caffeine late in the phase if PMS is strong', 'Cut back on alcohol and ultra-processed food, which can worsen PMS', 'Protein- and fibre-rich snacks steady blood sugar', 'Healthy fats (seeds, avocado, olive oil) support hormones']],
+        ['Body', ['Early: progesterone rises, so you feel warmer, sleepier and hungrier', 'Progesterone has a calming effect on mood and sleep, so when it dips you may notice irritability, poorer sleep and stronger cravings', 'Digestion slows, so bloating and constipation are common', 'Late: hormones drop before your period, which can feel turbulent, with fluid retention and cravings for carbs or salty food', 'Your body is getting ready to slow down: it needs calm more than performance', 'You burn a bit more energy and blood sugar is touchier', 'Cardio can feel harder than usual', 'Stress tolerance may be lower']],
+        ['Eat', ['Warm, regular meals, and do not skip dinner', 'Include a natural source of magnesium every day: cocoa, pumpkin seeds, almonds, legumes or spinach', 'A savoury breakfast with protein steadies energy better than a sugary one', 'Meet sweet cravings on purpose instead of fighting them: for example dark chocolate with fruit or protein', 'Ginger and omega-3 foods (oily fish, flaxseed) may ease pain and bloating', 'A warm, calming evening meal with wholegrains and good fats helps you wind down']],
         ['Move', ['Steady cardio instead of HIIT', 'Moderate weights, more reps', 'Take an extra rest day if you need it']],
         ['Sleep', ['Earlier bedtime, a calm wind-down', 'You may need more sleep, and that is normal', 'Aim for 7 to 9 hours']],
         ['Mind', ['Feeling more sensitive or less social is common', 'Strong feelings are not always "just hormones"', 'Ask what the feeling is telling you', 'Good time to notice what drains you and set boundaries', 'Journal instead of pushing the feeling away', 'Stress and poor sleep hit harder now, so rest more and say no more often', 'Cut back on social commitments', 'Delay big decisions if emotions run high']],
         ['Plan', ['Finish demanding tasks early', 'Tidy up and prepare for your period', 'Organise your home and routines', 'Keep the first days of your period light']]
       ],
       todo: [
-        ['Eat', 'Eat regularly, pairing carbs with protein or fat. Add fibre and magnesium-rich foods like greens, nuts and seeds, and go easy on salt if you bloat.'],
+        ['Eat', 'Warm, regular meals, and do not skip dinner. Add a magnesium-rich food each day (cocoa, pumpkin seeds, almonds, legumes, spinach), start the day with something savoury, and go easy on salt if you bloat.'],
         ['Move', 'Keep it gentle: walks, yoga, lighter strength sessions. Steady cardio and moderate weights suit better than HIIT. Hard cardio can feel tougher now.'],
         ['Sleep', 'Keep a steady bedtime and a cool room. Sleep can get lighter before your period.'],
         ['Mind', 'Mood can dip, so go easy on yourself and avoid stacking demanding plans.'],
@@ -294,6 +295,83 @@
   /* ---------- UI state ---------- */
   var ui = { view: 'today', patMonth: null, patIssue: null, patCycle: true, eatMonth: null, draft: null };
   var app = document.getElementById('app');
+
+  /* ---------- First-run onboarding ----------
+     Only shown when nothing has ever been saved on this device. Anyone who already has data or a chosen language is never interrupted. */
+  var ONB_KEY = 'healthtracker.onboarded';
+  var onboarding = (function () {
+    try { return !localStorage.getItem(KEY) && !localStorage.getItem(LANG_KEY) && !localStorage.getItem(ONB_KEY); } catch (e) { return false; }
+  })();
+  if (onboarding) applyLang('en');
+  function isInstalled() {
+    try { return !!(window.navigator.standalone || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)); } catch (e) { return false; }
+  }
+  var ONB_BC = [['combined', 'Combined pill'], ['progestin', 'Progestin-only pill'], ['patch', 'Patch or ring'], ['hiud', 'Hormonal IUD'], ['copper', 'Copper IUD'], ['implant', 'Implant'], ['injection', 'Injection'], ['other', 'Other or not sure']];
+  ui.onb = { step: 0, date: null, month: todayIso().slice(0, 8) + '01', bcYes: false, bc: 'combined', os: /android/i.test(navigator.userAgent) ? 'android' : 'ios' };
+  function viewOnboarding() {
+    var o = ui.onb, s = o.step, total = isInstalled() ? 3 : 4, h = '<div class="onb">';
+    h += '<button class="onb-back' + (s > 0 ? ' show' : '') + '" data-act="onbBack">‹ ' + tr('Back') + '</button><div class="onb-dots">';
+    for (var i = 0; i < total; i++) h += '<i' + (i <= s ? ' class="on"' : '') + '></i>';
+    h += '</div>';
+    if (s === 0) {
+      h += '<svg class="onb-moon" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="40" fill="#FAEFE3"/><circle cx="50" cy="50" r="40" fill="none" stroke="#E8823F" stroke-width="6"/><path d="M50 10a40 40 0 0 1 0 80a24 40 0 0 0 0-80z" fill="#E8823F"/></svg>' +
+        '<h1>' + tr('Welcome') + '</h1><p class="onb-lead">' + tr('Choose your language. It also sets which seasonal produce you see.') + '</p>' +
+        '<button class="radio ' + (lang === 'en' ? 'on' : '') + '" data-act="onbLang" data-l="en" aria-pressed="' + (lang === 'en') + '"><i></i><span>English<br><small class="onb-sub">Dutch seasonal produce</small></span></button>' +
+        '<button class="radio ' + (lang === 'it' ? 'on' : '') + '" data-act="onbLang" data-l="it" aria-pressed="' + (lang === 'it') + '"><i></i><span>Italiano<br><small class="onb-sub">Prodotti di stagione italiani</small></span></button>' +
+        '<div class="onb-spacer"></div><button class="btn" data-act="onbNext">' + tr('Continue') + '</button>';
+    } else if (s === 1) {
+      var y = +o.month.slice(0, 4), m = +o.month.slice(5, 7) - 1, first = (new Date(y, m, 1).getDay() + 6) % 7, n = new Date(y, m + 1, 0).getDate(), t = todayIso();
+      var atNow = o.month === t.slice(0, 8) + '01';
+      h += '<h1>' + tr('When did your last period start?') + '</h1><p class="onb-lead">' + tr('Tap the first day. A rough date is fine.') + '</p>' +
+        '<div class="onb-cal"><div class="onb-calhead"><button data-act="onbMonth" data-n="-1" aria-label="' + tr('Previous month') + '">‹</button><b>' + esc(cap(MONTHS[m])) + ' ' + y + '</b><button data-act="onbMonth" data-n="1" ' + (atNow ? 'disabled' : '') + ' aria-label="' + tr('Next month') + '">›</button></div>' +
+        '<div class="onb-grid wd">' + DOWS.map(function (d) { return '<span>' + esc(d.charAt(0)) + '</span>'; }).join('') + '</div><div class="onb-grid">';
+      for (i = 0; i < first; i++) h += '<span></span>';
+      for (i = 1; i <= n; i++) {
+        var di = y + '-' + pad(m + 1) + '-' + pad(i);
+        h += '<button data-act="onbDay" data-d="' + di + '" class="' + (di === t ? 'today ' : '') + (di === o.date ? 'sel' : '') + '"' + (di > t ? ' disabled' : '') + '>' + i + '</button>';
+      }
+      h += '</div></div><div class="onb-spacer"></div><button class="btn" data-act="onbNext" ' + (o.date ? '' : 'disabled') + '>' + tr('Continue') + '</button>' +
+        '<button class="btn onb-ghost" data-act="onbUnsure">' + tr('I’m not sure') + '</button>';
+    } else if (s === 2) {
+      h += '<h1>' + tr('Do you use any contraception?') + '</h1><p class="onb-lead">' + tr('Hormonal methods change your cycle, so the phases become only a rough guide.') + '</p>' +
+        '<div class="onb-row2"><button class="opt big ' + (o.bcYes ? '' : 'on') + '" data-act="onbBcg" data-v="no">' + tr('No') + '<small>' + tr('Natural cycle') + '</small></button>' +
+        '<button class="opt big ' + (o.bcYes ? 'on' : '') + '" data-act="onbBcg" data-v="yes">' + tr('Yes') + '<small>' + tr('Choose which') + '</small></button></div>';
+      if (o.bcYes) h += ONB_BC.map(function (b) { return '<button class="radio ' + (o.bc === b[0] ? 'on' : '') + '" data-act="onbBc" data-v="' + b[0] + '"><i></i>' + tr(b[1]) + '</button>'; }).join('');
+      h += '<div class="onb-info">' + tr(o.bcYes ? 'Hormones keep ovulation quiet, so phases are only a rough guide.' : 'Cycle phases and phase-based tips work as shown.') + '</div>' +
+        '<div class="onb-spacer"></div><button class="btn" data-act="onbNext">' + tr('Continue') + '</button>';
+    } else {
+      var I = {
+        share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M8 7l4-4 4 4M5 12v8h14v-8"/></svg>',
+        add: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8v8M8 12h8"/></svg>',
+        menu: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>'
+      };
+      function B(x) { return '<b>' + esc(tr(x)) + '</b>'; }
+      var steps = o.os === 'ios' ? [
+        tr('Open this page in {b}', { b: '<b>Safari</b>' }),
+        tr('Tap the Share button {i} at the bottom', { i: I.share }),
+        tr('Scroll down and tap {b} {i}', { b: B('Add to Home Screen'), i: I.add }),
+        tr('Tap {b}, then open the app from your home screen', { b: B('Add') })
+      ] : [
+        tr('Open this page in {b}', { b: '<b>Chrome</b>' }),
+        tr('Tap the menu {i} at the top right', { i: I.menu }),
+        tr('Tap {b} or {c}', { b: B('Install app'), c: B('Add to Home screen') }),
+        tr('Confirm, then open the app from your home screen')
+      ];
+      h += '<h1>' + tr('Add it to your home screen') + '</h1>' +
+        '<div class="onb-seg"><button class="' + (o.os === 'ios' ? 'on' : '') + '" data-act="onbOs" data-v="ios">iPhone (Safari)</button><button class="' + (o.os === 'android' ? 'on' : '') + '" data-act="onbOs" data-v="android">Android (Chrome)</button></div>' +
+        '<ol class="onb-how">' + steps.map(function (x) { return '<li><span>' + x + '</span></li>'; }).join('') + '</ol>' +
+        '<div class="onb-alert" role="alert"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20L12 3zM12 10v4M12 17.5v.01"/></svg><span><b>' + tr('Careful:') + '</b> ' + tr('clearing your browser history or data also deletes your data in this app. Make a backup in Settings first.') + '</span></div>' +
+        '<div class="onb-spacer"></div><button class="btn" data-act="onbFinish">' + tr('Start tracking') + '</button><button class="btn onb-ghost" data-act="onbFinish">' + tr('I’ll do this later') + '</button>';
+    }
+    return h + '</div>';
+  }
+  function onbFinish() {
+    var o = ui.onb;
+    if (o.date) { db.periodStarts.push(o.date); db.periodStarts.sort(); }
+    db.settings.birthControl = o.bcYes ? o.bc : 'none';
+    try { localStorage.setItem(LANG_KEY, lang); localStorage.setItem(ONB_KEY, '1'); } catch (e) { /* ignore */ }
+    onboarding = false; save(); go('today');
+  }
 
   function go(view, extra) {
     if (view === 'settings') ui.bcOpen = false;
@@ -423,7 +501,7 @@
   }
 
   var HORMONE_INFO = [
-    ['Estrogen', '#E4572E', 'The main growth hormone of the cycle. It builds up the womb lining, helps an egg mature, and supports bone strength, skin, and mood-lifting brain chemicals like serotonin. It is also why many people feel brighter and more social when it is high.'],
+    ['Estrogen', '#E4572E', 'The main building hormone of the cycle. It builds up the womb lining, helps an egg mature, and supports bone strength, skin, and mood-lifting brain chemicals like serotonin. It is also why many people feel brighter and more social when it is high.'],
     ['Progesterone', '#D6479B', 'The calming, protective hormone. It prepares and holds the womb lining in place in case of pregnancy, and it raises body temperature slightly. It also acts on the brain in a sedating way, which is why it can bring sleepiness, a bigger appetite, bloating and sore breasts.'],
     ['Testosterone', '#5F6B7A', 'Yes, you make it too, in smaller amounts. It supports sex drive, muscle and bone, and motivation and energy. It is fairly steady through the cycle, with a small lift around ovulation.'],
     ['LH', '#1EA3C2', 'Short for luteinizing hormone. It is the trigger that makes the ovary release a mature egg, which is ovulation. After that it helps the empty follicle turn into the structure that makes progesterone.']
@@ -751,6 +829,7 @@
     ['other', 'Other or not sure', 'Rough guide', 'Phases are shown as a rough guide.']
   ];
   var SOURCES = [
+    ['Monica Germani, Chiara Amati', 'Il bello degli ormoni (Mondadori)', ''],
     ['Roots to Leaves', 'If Your Luteal Phase Sucks, Then Read This', 'https://rootstoleaves.substack.com/p/if-your-luteal-phase-sucks-then-read'],
     ['Sabrina Rose', 'The Transformative Power of the Luteal Phase', 'https://moonbeambysabrina.substack.com/p/the-transformative-power-of-the-luteal'],
     ['Bhielle', 'softening into your luteal phase', 'https://bhielle.substack.com/p/softening-into-your-luteal-phase'],
@@ -780,8 +859,7 @@
       '<button class="btn secondary" data-act="importNotes">' + tr('Import data') + '</button>' +
       '<button class="btn secondary" data-act="export">' + tr('Download backup') + '</button>' +
       '<button class="btn danger" data-act="wipe">' + tr('Delete all my data') + '</button>';
-    // Sources list hidden for now (SOURCES array kept above to restore later).
-    /* h += '<div class="label">' + tr('Sources') + '</div><p class="sub">' + tr('Personal perspectives, not medical advice. The tips in the app are my own summaries of:') + '</p><ul class="know" style="margin-bottom:16px">' + SOURCES.map(function (r) { return '<li><a href="' + r[2] + '" target="_blank" rel="noopener">' + esc(r[1]) + '</a> (' + esc(r[0]) + ')</li>'; }).join('') + '</ul>'; */
+    h += '<div class="label">' + tr('Sources') + '</div><p class="sub">' + tr('Not medical advice. The tips in the app are my own summaries of these sources:') + '</p><ul class="know" style="margin-bottom:16px">' + SOURCES.map(function (r) { return '<li>' + (r[2] ? '<a href="' + r[2] + '" target="_blank" rel="noopener">' + esc(r[1]) + '</a>' : esc(r[1])) + ' (' + esc(r[0]) + ')</li>'; }).join('') + '</ul>';
     return h + navBar('settings');
   }
 
@@ -981,46 +1059,46 @@ var IMPORT = {
 };
   var EAT_PHASE = {
     period: {
-      why: 'You lose iron with your flow. Pair iron-rich greens with something vitamin C-rich so you absorb more of it. Warm, cooked meals often feel best.',
+      why: 'You lose iron with your flow. Pair iron-rich greens with something vitamin C-rich so you absorb more of it. Simple, warm, cooked meals with iron and B vitamins often feel best. Iron from plants is absorbed less well than iron from meat, fish or eggs, and spinach and chard are weaker sources than they look. Lentils, beans, eggs and red meat are the stronger options.',
       foods: ['spinach', 'kale', 'beetroot', "lamb's lettuce", 'broccoli', 'Brussels sprouts', 'sorrel', 'peas', 'broad beans', 'strawberry', 'bell pepper', 'blackcurrant', 'redcurrant', 'cabbage', 'orange', 'kiwi', 'clementine', 'grapefruit', 'lemon', 'chard', 'mandarin']
     },
     follicular: {
-      why: 'Energy is building. Fresh, light, crunchy food works well, with some protein to go with it.',
-      foods: ['white asparagus', 'green asparagus', 'radish', 'spinach', 'lettuce', 'spring onion', 'peas', 'broccoli', 'cauliflower', 'cucumber', 'kohlrabi', 'rhubarb', 'strawberry', 'fennel', 'sorrel', 'artichoke', 'chard']
+      why: 'Energy is building and your body copes well with complex carbs. Colourful, lighter meals with some protein, bitter greens and plenty of water suit this phase.',
+      foods: ['white asparagus', 'green asparagus', 'radish', 'spinach', 'lettuce', 'spring onion', 'peas', 'broccoli', 'cauliflower', 'cucumber', 'kohlrabi', 'rhubarb', 'strawberry', 'fennel', 'sorrel', 'artichoke', 'chard', 'chicory', 'radicchio', "lamb's lettuce", 'cabbage', 'carrot', 'apple', 'kiwi', 'orange']
     },
     ovulation: {
-      why: 'Fibre, colour and plenty of water. Berries, tomatoes and veg with lots of antioxidants are a good fit.',
-      foods: ['tomato', 'courgette', 'bell pepper', 'fennel', 'cucumber', 'raspberry', 'blueberry', 'strawberry', 'blackberry', 'cherry', 'broccoli', 'cauliflower', 'green beans', 'lettuce', 'radish', 'apricot', 'peach', 'nectarine', 'watermelon']
+      why: 'Fibre, colour and plenty of water. Berries, tomatoes and veg with lots of antioxidants are a good fit. Protein and fibre keep blood sugar steady. In winter, think red cabbage, citrus, kiwi and pomegranate.',
+      foods: ['tomato', 'courgette', 'bell pepper', 'fennel', 'cucumber', 'raspberry', 'blueberry', 'strawberry', 'blackberry', 'cherry', 'broccoli', 'cauliflower', 'green beans', 'lettuce', 'radish', 'apricot', 'peach', 'nectarine', 'watermelon', 'cabbage', 'beetroot', 'carrot', 'chicory', 'blood orange', 'kiwi', 'pomegranate', 'persimmon', 'apple', 'pear']
     },
     luteal: {
-      why: 'Your body burns a bit more energy now, so regular meals with some slow carbs, fibre and magnesium help keep mood and cravings steadier. Try not to skip meals.',
+      why: 'Hunger and sweet cravings often rise as progesterone falls. Warm, regular meals, protein, fibre and magnesium-rich foods help. Plan for cravings instead of fighting them.',
       foods: ['pumpkin', 'sweetcorn', 'spinach', 'kale', 'parsnip', 'carrot', 'beetroot', 'leek', 'celeriac', 'savoy cabbage', 'red cabbage', 'white cabbage', 'cauliflower', 'broccoli', 'apple', 'pear', 'plum', 'new potatoes', 'chestnut', 'chard', 'fennel', 'celery']
     }
   };
-  var GUT_FOODS = ['carrot', 'pumpkin', 'courgette', 'parsnip', 'cucumber', 'blueberry', 'strawberry', 'spinach', 'new potatoes', 'sweetcorn'];
+  var GUT_FOODS = ['carrot', 'pumpkin', 'courgette', 'parsnip', 'cucumber', 'blueberry', 'strawberry', 'spinach', 'new potatoes'];
   var EAT_WHY = {
     period: {
-      spinach: 'Iron, folate', kale: 'Iron, vitamin C', beetroot: 'Iron, folate', "lamb's lettuce": 'Iron, vitamin C', broccoli: 'Iron, vitamin C',
+      spinach: 'Folate, some iron', kale: 'Iron, vitamin C', beetroot: 'Folate', "lamb's lettuce": 'Iron, vitamin C', broccoli: 'Vitamin C, folate',
       'Brussels sprouts': 'Vitamin C, iron', sorrel: 'Iron', peas: 'Plant iron, protein', 'broad beans': 'Plant iron, protein', strawberry: 'Vitamin C',
       'bell pepper': 'Vitamin C', blackcurrant: 'Vitamin C', redcurrant: 'Vitamin C', cabbage: 'Vitamin C, fibre',
-      orange: 'Vitamin C', kiwi: 'Vitamin C', clementine: 'Vitamin C', grapefruit: 'Vitamin C', lemon: 'Vitamin C', chard: 'Iron, folate', mandarin: 'Vitamin C'
+      orange: 'Vitamin C', kiwi: 'Vitamin C', clementine: 'Vitamin C', grapefruit: 'Vitamin C', lemon: 'Vitamin C', chard: 'Magnesium, folate', mandarin: 'Vitamin C'
     },
     follicular: {
-      'white asparagus': 'Light, folate', 'green asparagus': 'Light, folate', radish: 'Fresh, vitamin C', spinach: 'Folate, iron',
+      'white asparagus': 'Light, folate', 'green asparagus': 'Light, folate', radish: 'Fresh, vitamin C', spinach: 'Folate',
       lettuce: 'Light, hydrating', 'spring onion': 'Light, fresh', peas: 'Protein, fibre', broccoli: 'Fibre, folate',
       cauliflower: 'Fibre, vitamin C', cucumber: 'Hydrating', kohlrabi: 'Vitamin C', rhubarb: 'Fibre',
-      strawberry: 'Vitamin C', fennel: 'Gentle digestion', sorrel: 'Fresh greens', artichoke: 'Gentle digestion', chard: 'Folate, iron'
+      strawberry: 'Vitamin C', fennel: 'Gentle digestion', sorrel: 'Fresh greens', artichoke: 'Gentle digestion', chard: 'Folate', chicory: 'Crunchy, fibre', radicchio: 'Crunchy, fibre', "lamb's lettuce": 'Light, folate', cabbage: 'Crunchy, fibre', carrot: 'Crunchy, fibre', apple: 'Crunchy, fibre', kiwi: 'Vitamin C, fibre', orange: 'Vitamin C'
     },
     ovulation: {
       tomato: 'Lycopene', courgette: 'Light, fibre', 'bell pepper': 'Antioxidants, vitamin C', fennel: 'Fibre',
       cucumber: 'Hydrating', raspberry: 'Fibre, antioxidants', blueberry: 'Fibre, antioxidants', strawberry: 'Antioxidants, vitamin C', blackberry: 'Fibre, antioxidants',
-      cherry: 'Antioxidants', broccoli: 'Fibre, vitamin C', cauliflower: 'Fibre', 'green beans': 'Fibre', lettuce: 'Water-rich', radish: 'Water-rich', apricot: 'Antioxidants', peach: 'Antioxidants', nectarine: 'Antioxidants', watermelon: 'Hydrating'
+      cherry: 'Antioxidants', broccoli: 'Fibre, vitamin C', cauliflower: 'Fibre', 'green beans': 'Fibre', lettuce: 'Water-rich', radish: 'Water-rich', apricot: 'Antioxidants', peach: 'Antioxidants', nectarine: 'Antioxidants', watermelon: 'Hydrating', cabbage: 'Fibre, vitamin C', beetroot: 'Fibre, folate', carrot: 'Fibre', chicory: 'Fibre', 'blood orange': 'Vitamin C, antioxidants', kiwi: 'Vitamin C, fibre', pomegranate: 'Antioxidants, fibre', persimmon: 'Fibre, vitamin C', apple: 'Fibre', pear: 'Fibre'
     },
     luteal: {
-      pumpkin: 'Slow carbs, magnesium', sweetcorn: 'Slow carbs', spinach: 'Magnesium, iron', kale: 'Magnesium, calcium',
-      parsnip: 'Slow carbs, fibre', carrot: 'Fibre', beetroot: 'Fibre, iron', leek: 'Gentle fibre', celeriac: 'Fibre',
-      cabbage: 'Fibre', cauliflower: 'Fibre, B vitamins', broccoli: 'Fibre, B vitamins', apple: 'Fibre', pear: 'Fibre',
-      plum: 'Fibre', 'new potatoes': 'Slow carbs', chestnut: 'Slow carbs, fibre', chard: 'Magnesium, iron', fennel: 'Gentle digestion', celery: 'Fibre'
+      pumpkin: 'Slow carbs, magnesium', sweetcorn: 'Slow carbs', spinach: 'Magnesium, folate', kale: 'Magnesium, calcium',
+      parsnip: 'Slow carbs, fibre', carrot: 'Fibre', beetroot: 'Fibre, folate', leek: 'Gentle fibre', celeriac: 'Fibre',
+      cabbage: 'Fibre, B vitamins', cauliflower: 'Fibre, B vitamins', broccoli: 'Fibre, B vitamins', apple: 'Fibre', pear: 'Fibre',
+      plum: 'Fibre', 'new potatoes': 'Slow carbs', chestnut: 'Slow carbs, fibre', chard: 'Magnesium', fennel: 'Gentle digestion', celery: 'Fibre'
     }
   };
   
@@ -1220,6 +1298,7 @@ function viewLearn() {
 
   function render() {
     var v = ui.view, html;
+    if (onboarding) { app.className = 'noNav'; app.innerHTML = viewOnboarding(); return; }
     if (v === 'today') html = viewToday();
     else if (v === 'patterns') html = viewPatterns();
     else if (v === 'eat') html = viewEat();
@@ -1493,6 +1572,16 @@ impGo: function () {
     wipe: function () {
       if (window.confirm(tr('Delete all your data from this device? This cannot be undone.'))) { db = defaultDb(); save(); go('today'); toast(tr('All data deleted')); }
     },
+    onbLang: function (el) { var l = el.getAttribute('data-l'); if (l === 'en' || l === 'it') { applyLang(l); render(); } },
+    onbNext: function () { var o = ui.onb; if (o.step === 2 && isInstalled()) return onbFinish(); o.step++; render(); window.scrollTo(0, 0); },
+    onbBack: function () { if (ui.onb.step > 0) { ui.onb.step--; render(); window.scrollTo(0, 0); } },
+    onbDay: function (el) { ui.onb.date = el.getAttribute('data-d'); render(); },
+    onbMonth: function (el) { var o = ui.onb, d = new Date(+o.month.slice(0, 4), +o.month.slice(5, 7) - 1 + (+el.getAttribute('data-n')), 1); o.month = iso(d); render(); },
+    onbUnsure: function () { ui.onb.date = null; ui.onb.step = 2; render(); window.scrollTo(0, 0); },
+    onbBcg: function (el) { ui.onb.bcYes = el.getAttribute('data-v') === 'yes'; render(); },
+    onbBc: function (el) { ui.onb.bc = el.getAttribute('data-v'); render(); },
+    onbOs: function (el) { ui.onb.os = el.getAttribute('data-v'); render(); },
+    onbFinish: onbFinish,
     setLang: function (el) {
       var l = el.getAttribute('data-l');
       if (l !== 'en' && l !== 'it') return;
