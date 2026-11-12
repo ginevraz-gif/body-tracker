@@ -152,7 +152,7 @@
     ['When it tends to happen', 'Quando tende ad accadere'], ['{n}% of your logged days', '{n}% dei giorni registrati'],
     ['Based on everything you have logged for this. More cycles make it more reliable.', 'Basato su tutto ciò che hai registrato. Più cicli lo rendono più affidabile.'],
     ['Your notes', 'Le tue note'], ['Didn’t poo', 'Niente cacca'], ['See all entries', 'Vedi tutte le voci'],
-    ['Everything you logged', 'Tutto ciò che hai registrato'], ['All entries', 'Tutte le voci'],
+    ['Everything you logged', 'Tutto ciò che hai registrato'], ['Overview', 'Panoramica'], ['Details', 'Dettagli'], ['Less', 'Meno'], ['More', 'Di più'], ['Symptom strength over the month', 'Intensità dei sintomi nel mese'], ['All entries', 'Tutte le voci'],
     ['Newest first. Tap the pencil to change an entry, or the bin to delete it. You can undo straight after.', 'Prima le più recenti. Tocca la matita per modificare una voce o il cestino per eliminarla. Puoi annullare subito dopo.'],
     ['Nothing logged yet.', 'Ancora niente registrato.'], ['Period started', 'Ciclo iniziato'],
     ['Delete {title} from {when}', 'Elimina {title} del {when}'],

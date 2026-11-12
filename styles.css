@@ -483,3 +483,38 @@ textarea { min-height: 92px; resize: vertical; }
 .dlg-box .dlg-tip { margin-top: 10px; font-size: 14px; }
 .dlg-box .btn { margin-top: 12px; }
 .dlg-box .dlg-yes { margin-top: 20px; background: #C0392B; color: #fff; border: 2px solid #C0392B; }
+
+/* Patterns: Overview | History */
+.pat-banner { margin-bottom: 12px; }
+.seg { display: flex; background: #F8EEE4; border-radius: 999px; padding: 6px; margin-bottom: 14px; }
+.seg button { flex: 1; border: 0; background: none; padding: 11px 8px; border-radius: 999px; font-weight: 700; font-size: 16px; color: var(--ink); }
+.seg button.on { background: var(--brand); color: #fff; }
+.cal-nav { display: flex; gap: 10px; }
+.round-nav { width: 44px; height: 44px; border-radius: 50%; border: 0; background: #F8EEE4; display: grid; place-items: center; padding: 0; }
+.round-nav:disabled { opacity: .35; }
+.card .cal-head { margin-bottom: 10px; font-size: 22px; }
+.pcal { gap: 6px; margin-bottom: 14px; }
+.pday { aspect-ratio: 1.15; border-radius: 12px; display: grid; place-items: center; font-size: 16px; font-weight: 600; background: #EFEDF7; }
+.pday.today { outline: 2px solid var(--ink); outline-offset: -1px; }
+.phlegend { justify-content: flex-start; flex-wrap: wrap; gap: 6px 14px; }
+.phlegend i { border: 1.5px solid; }
+.pchart svg { width: 100%; height: auto; display: block; font-size: 12px; fill: var(--muted); }
+.pchart .axis text { fill: var(--muted); }
+.clegend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font-size: 14px; color: var(--ink); }
+.clegend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+.hmap { background: #F8EEE4; border-color: transparent; padding: 18px 14px; }
+.hm-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.hm-name { flex: 0 0 84px; font-weight: 700; font-size: 13px; line-height: 1.15; overflow-wrap: break-word; hyphens: auto; }
+.hm-cells, .hm-x { flex: 1; display: grid; gap: 1.5px; min-width: 0; }
+.hm-x { font-size: 12px; color: var(--muted); }
+.hm-ph { height: 10px; border-radius: 3px; }
+.hm { display: block; height: 26px; border-radius: 3px; background: #EADFD0; }
+.hm.lx { background: transparent; border: 1px dashed #E3D6C5; }
+.hm.l0 { background: #EADFD0; }
+.hm.l1 { background: #EBB594; }
+.hm.l2 { background: #D2793F; }
+.hm.l3 { background: #A84E1F; }
+.hmlegend { display: flex; justify-content: flex-end; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); margin: 14px 0 0; }
+.hmlegend .hm { width: 22px; height: 16px; border-radius: 5px; }
+.cal-head.standalone { font-size: 22px; margin: 6px 4px 12px; }
+.pday.future { color: #4A4452; font-weight: 600; border: 1.5px dashed rgba(42,36,51,.22); }

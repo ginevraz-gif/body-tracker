@@ -414,13 +414,14 @@
 
   /* ---------- Views ---------- */
   function navBar(active) {
-    function tab(v, ic, label) {
-      return '<button class="' + (active === v ? 'on' : '') + '" data-act="go" data-v="' + v + '"' + (active === v ? ' aria-current="page"' : '') + '>' + icon(ic) + '<span>' + tr(label) + '</span></button>';
+    function tab(v, ic, label, group) {
+      var on = group ? group.indexOf(active) !== -1 : active === v;
+      return '<button class="' + (on ? 'on' : '') + '" data-act="go" data-v="' + v + '"' + (on ? ' aria-current="page"' : '') + '>' + icon(ic) + '<span>' + tr(label) + '</span></button>';
     }
     return '<nav class="nav" aria-label="' + tr('Main') + '">' +
       tab('today', 'target', 'Today') + tab('eat', 'leaf', 'Eat') +
       '<button class="fab" data-act="go" data-v="log" aria-label="' + tr('Log something') + '">' + icon('plus') + '</button>' +
-      tab('history', 'list', 'History') + tab('settings', 'sliders', 'Settings') +
+      tab('patterns', 'trend', 'Patterns', ['patterns', 'history']) + tab('settings', 'sliders', 'Settings') +
       '</nav>';
   }
 
@@ -896,9 +897,90 @@
     var d = new Date(+ym.slice(0, 4), +ym.slice(5, 7) - 1 + n, 1);
     return d.getFullYear() + '-' + pad(d.getMonth() + 1);
   }
+  function patHeader(active) {
+    return '<div class="banner pat-banner"><h1>' + tr('Patterns') + '</h1></div>' +
+      '<div class="seg" role="tablist">' +
+      ['patterns', 'history'].map(function (v) {
+        return '<button role="tab" class="' + (active === v ? 'on' : '') + '" aria-selected="' + (active === v) + '" data-act="go" data-v="' + v + '">' + tr(v === 'patterns' ? 'Overview' : 'History') + '</button>';
+      }).join('') + '</div>';
+  }
+  function phaseOn(d) {
+    var ci = cycleInfo(d);
+    if (!ci) return null;
+    if (d > todayIso() || ci.late) {
+      var cl = db.settings.cycleLength, n = diffDays(d, ci.start);
+      return phaseOfDay((n % cl) + 1);
+    }
+    return ci.phase;
+  }
+  function dayStrengths(issueId) {
+    var map = {};
+    db.entries.forEach(function (e) {
+      if (e.issueId !== issueId) return;
+      var v = typeof e.strength === 'number' ? e.strength : (e.level || 1) * 3;
+      entryDays(e).forEach(function (d) { if (map[d] === undefined || map[d] < v) map[d] = v; });
+    });
+    return map;
+  }
+  function smoothPath(pts, lo, hi) {
+    if (pts.length < 2) return '';
+    function cl(y) { return Math.max(lo, Math.min(hi, y)); }
+    var d = 'M' + pts[0][0].toFixed(1) + ' ' + pts[0][1].toFixed(1);
+    for (var i = 0; i < pts.length - 1; i++) {
+      var p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+      d += ' C' + (p1[0] + (p2[0] - p0[0]) / 6).toFixed(1) + ' ' + cl(p1[1] + (p2[1] - p0[1]) / 6).toFixed(1) + ',' +
+        (p2[0] - (p3[0] - p1[0]) / 6).toFixed(1) + ' ' + cl(p2[1] - (p3[1] - p1[1]) / 6).toFixed(1) + ',' + p2[0].toFixed(1) + ' ' + p2[1].toFixed(1);
+    }
+    return d;
+  }
+  function patCalendar(ym, t, offset, all) {
+    var cells = DOWS.map(function (w) { return '<div class="dow">' + w + '</div>'; }).join('');
+    for (var b = 0; b < offset; b++) cells += '<div></div>';
+    all.forEach(function (d, i) {
+      var ph = phaseOn(d), cls = 'pday' + (d === t ? ' today' : '') + (d > t ? ' future' : '');
+      cells += '<div class="' + cls + '"' + (ph ? ' style="background:' + PHASES[ph].hex + (d > t ? '30' : '66') + '"' : '') + ' title="' + shortDate(d) + (ph ? ' · ' + pl(ph) : '') + '">' + (i + 1) + '</div>';
+    });
+    var legend = ['period', 'follicular', 'ovulation', 'luteal'].map(function (k) { return '<span><i style="background:' + PHASES[k].hex + '33;border-color:' + PHASES[k].hex + '"></i>' + pl(k) + '</span>'; }).join('');
+    return '<div class="pgrid pcal">' + cells + '</div><div class="hlegend phlegend">' + legend + '</div>';
+  }
+  function patChart(issues, all, t, colors) {
+    var W = 340, H = 210, L = 30, R = 8, T = 8, B = 26, pw = W - L - R, ph = H - T - B, n = all.length;
+    function X(i) { return L + (n > 1 ? i / (n - 1) : 0) * pw; }
+    function Y(v) { return T + ph - v / 10 * ph; }
+    var bands = '', i = 0;
+    while (i < n) {
+      var p = phaseOn(all[i]), j = i;
+      while (j + 1 < n && phaseOn(all[j + 1]) === p) j++;
+      var x0 = i === 0 ? L : (X(i) + X(i - 1)) / 2, x1 = j === n - 1 ? L + pw : (X(j) + X(j + 1)) / 2;
+      bands += '<rect x="' + x0.toFixed(1) + '" y="' + T + '" width="' + (x1 - x0).toFixed(1) + '" height="' + ph + '" fill="' + (p ? PHASES[p].hex + '33' : '#EFE9E2') + '"/>';
+      i = j + 1;
+    }
+    var grid = '<line x1="' + L + '" x2="' + (L + pw) + '" y1="' + Y(5) + '" y2="' + Y(5) + '" stroke="#9a929f" stroke-dasharray="3 3" stroke-width="1" opacity=".6"/>';
+    var ylab = [0, 5, 10].map(function (v) { return '<text x="' + (L - 8) + '" y="' + (Y(v) + 4) + '" text-anchor="end">' + v + '</text>'; }).join('');
+    var xlab = [1, 8, 15, 22, n].map(function (d) { return '<text x="' + X(d - 1).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="' + (d === n ? 'end' : d === 1 ? 'start' : 'middle') + '">' + d + '</text>'; }).join('');
+    var lines = issues.map(function (x, idx) {
+      var m = dayStrengths(x.id), pts = [];
+      all.forEach(function (d, k) { if (d <= t) pts.push([X(k), Y(m[d] || 0)]); });
+      if (pts.length === 1) return '<circle cx="' + pts[0][0] + '" cy="' + pts[0][1] + '" r="3" fill="' + colors[idx % colors.length] + '"/>';
+      return '<path d="' + smoothPath(pts, Y(10), Y(0)) + '" fill="none" stroke="' + colors[idx % colors.length] + '" stroke-width="2.5" stroke-linecap="round"' + (idx % 5 === 4 ? ' stroke-dasharray="1 5"' : '') + '/>';
+    }).join('');
+    var legend = issues.map(function (x, idx) { return '<span><i style="background:' + colors[idx % colors.length] + '"></i>' + esc(iname(x)) + '</span>'; }).join('');
+    return '<section class="card pchart"><svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + tr('Symptom strength over the month') + '"><g class="axis">' + bands + grid + ylab + xlab + '</g>' + lines + '</svg><div class="clegend">' + legend + '</div></section>';
+  }
+  function patHeat(issues, all, t, first) {
+    var n = all.length, strip = '<div class="hm-row"><span class="hm-name"></span><div class="hm-cells" style="grid-template-columns:repeat(' + n + ',1fr)">' +
+      all.map(function (d) { var p = phaseOn(d); return '<i class="hm-ph" style="background:' + (p ? PHASES[p].hex : '#D8D2CB') + '"></i>'; }).join('') + '</div></div>';
+    var rows = issues.map(function (x) {
+      var lv = dayLevels(x.id);
+      return '<div class="hm-row"><span class="hm-name">' + esc(iname(x)) + '</span><div class="hm-cells" style="grid-template-columns:repeat(' + n + ',1fr)">' +
+        all.map(function (d) { var c = d > t || d < first ? 'x' : (lv[d] || 0); return '<i class="hm l' + c + '" title="' + shortDate(d) + '"></i>'; }).join('') + '</div></div>';
+    }).join('');
+    var xl = '<div class="hm-row"><span class="hm-name"></span><div class="hm-x" style="grid-template-columns:repeat(' + n + ',1fr)">' + [1, 8, 15, 22, n].map(function (d) { return d === n ? '<span style="grid-column:' + (n - 2) + '/span 3;justify-self:end">' + d + '</span>' : '<span style="grid-column:' + d + '/span 3;justify-self:start">' + d + '</span>'; }).join('') + '</div></div>';
+    return '<section class="card hmap">' + strip + rows + xl + '<div class="hmlegend"><span>' + tr('Less') + '</span><i class="hm l0"></i><i class="hm l1"></i><i class="hm l2"></i><i class="hm l3"></i><span>' + tr('More') + '</span></div>' + '</section>';
+  }
   function viewPatterns() {
     var t = todayIso(), first = firstDataDate();
-    var h = '<div class="banner"><div><small>' + (first ? tr('Your days at a glance') : tr('Nothing yet')) + '</small><h1>' + tr('Patterns') + '</h1></div></div>';
+    var h = patHeader('patterns');
     if (!first || !db.entries.length) {
       return h + '<div class="card empty"><h2>' + tr('No patterns yet') + '</h2><p>' + tr('Log a few days with the + button and your patterns will show up here.') + '</p></div>' + navBar('patterns');
     }
@@ -913,63 +995,14 @@
     var dows = DOWS.map(function (w) { return '<div class="dow">' + w + '</div>'; }).join('');
     var colors = ['#B04F1E', '#4B4BA0', '#3F7A63', '#8B3A5A', '#B8862F', '#1F4A78'];
 
-    h += '<div class="cal-head standalone"><button data-act="patMonth" data-n="-1" ' + (ym <= firstYm ? 'disabled' : '') + ' aria-label="' + tr('Previous month') + '">' + icon('back') + '</button>' +
-      '<span>' + cap(MONTHS[+ym.slice(5, 7) - 1]) + ' ' + ym.slice(0, 4) + '</span>' +
-      '<button data-act="patMonth" data-n="1" ' + (ym >= cur ? 'disabled' : '') + ' aria-label="' + tr('Next month') + '">' + icon('chevR') + '</button></div>';
-    h += '<button class="opt sm toggle ' + (ui.patCycle ? 'on' : '') + '" data-act="patCycle" aria-pressed="' + (ui.patCycle ? 'true' : 'false') + '">' + (ui.patCycle ? '✓ ' : '') + tr('Show my cycle') + '</button>';
-
-    // One section per logged issue, never mixed together.
-    var logged = {};
-    db.entries.forEach(function (e) { logged[e.issueId] = 1; });
-    var issues = db.issues.filter(function (x) { return x.kind !== 'period' && logged[x.id]; });
-    issues.forEach(function (x, idx) {
-      var levels = dayLevels(x.id), n = daysIn(x.id, days), p = comparable ? daysIn(x.id, prevAll) : null;
-      var cells = dows;
-      for (var b = 0; b < offset; b++) cells += '<div></div>';
-      all.forEach(function (d, i) {
-        var cls = d > t ? 'future' : d < first ? 'before' : 'l' + (levels[d] || 0);
-        if (d === t) cls += ' today';
-        var phStyle = '', phName = '';
-        if (ui.patCycle && d <= t) {
-          var ci = cycleInfo(d);
-          if (ci) { cls += ' hasph'; phStyle = ' style="--ph:' + PHASES[ci.phase].hex + '"'; phName = ' · ' + pl(ci.phase); }
-        }
-        cells += '<div class="pcell ' + cls + '"' + phStyle + ' title="' + shortDate(d) + phName + '">' + (i + 1) + '</div>';
-      });
-      var cmp = p === null ? '' : n === p ? tr('Same as last month') : n < p ? tr('{n} fewer than last month', { n: p - n }) : tr('{n} more than last month', { n: n - p });
-      h += '<section class="card"><div class="issue-row" style="margin-bottom:14px"><div class="top"><span>' + esc(iname(x)) + '</span><span>' + tn('{n} day', '{n} days', n) + '</span></div>' +
-        (N ? '<div class="bar"><i style="width:' + (n ? Math.max(2, Math.round(n / N * 100)) : 0) + '%;background:' + colors[idx % colors.length] + '"></i></div>' : '') +
-        (cmp ? '<small>' + cmp + '</small>' : '') + '</div>' +
-        '<div class="pgrid">' + cells + '</div>' +
-        '<div class="hlegend"><span><i class="l0"></i>' + tr('Good') + '</span><span><i class="l1"></i>' + tr('Mild') + '</span><span><i class="l2"></i>' + tr('Medium') + '</span><span><i class="l3"></i>' + tr('Strong') + '</span></div>';
-
-      if (db.periodStarts.length) {
-        var phDays = { period: 0, follicular: 0, ovulation: 0, luteal: 0 }, total = 0, seen = {};
-        db.entries.forEach(function (e) {
-          if (e.issueId !== x.id) return;
-          entryDays(e).forEach(function (d) {
-            if (seen[d]) return; seen[d] = 1;
-            var ci = cycleInfo(d); if (!ci) return;
-            phDays[ci.phase]++; total++;
-          });
-        });
-        if (total) {
-          h += '<div class="label" style="margin-top:18px">' + tr('When it tends to happen') + '</div>' + phaseLayout().map(function (ph) {
-            var c = phDays[ph.key], pct = Math.round(c / total * 100);
-            return '<div class="issue-row"><div class="top"><span>' + pl(ph.key) + '</span><span>' + tn('{n} day', '{n} days', c) + '</span></div><div class="bar"><i style="width:' + (c ? Math.max(2, pct) : 0) + '%;background:' + PHASES[ph.key].hex + '"></i></div><small>' + tr('{n}% of your logged days', { n: pct }) + '</small></div>';
-          }).join('') + '<p class="sub" style="margin:12px 0 0;font-size:14px">' + tr('Based on everything you have logged for this. More cycles make it more reliable.') + '</p>';
-        }
-      }
-
-      var notes = db.entries.filter(function (e) { return e.issueId === x.id && e.note && e.start.slice(0, 7) === ym; }).sort(function (a, b) { return a.start < b.start ? 1 : -1; });
-      if (notes.length) {
-        h += '<div class="label" style="margin-top:18px">' + tr('Your notes') + '</div>' + notes.map(function (e) {
-          return '<div class="note-item"><small>' + shortDate(e.start) + (e.symptoms && e.symptoms.length ? ' · ' + esc(e.symptoms.map(function (z) { return tr(z); }).join(', ')) : e.noPoo ? ' · ' + tr('Didn’t poo') : e.where ? ' · ' + esc(tr(e.where)) : '') + '</small>' + esc(e.note) + '</div>';
-        }).join('');
-      }
-      h += '</section>';
-    });
-    h += '<button class="btn secondary" data-act="history" data-from="patterns">' + tr('See all entries') + '</button>';
+    h += '<div class="cal-head standalone"><span>' + cap(MONTHS[+ym.slice(5, 7) - 1]) + ' ' + ym.slice(0, 4) + '</span><span class="cal-nav">' +
+      '<button class="round-nav" data-act="patMonth" data-n="-1" ' + (ym <= firstYm ? 'disabled' : '') + ' aria-label="' + tr('Previous month') + '">' + icon('back') + '</button>' +
+      '<button class="round-nav" data-act="patMonth" data-n="1" ' + (ym >= cur ? 'disabled' : '') + ' aria-label="' + tr('Next month') + '">' + icon('chevR') + '</button></span></div>' +
+      '<section class="card">' + patCalendar(ym, t, offset, all) + '</section>';
+    var loggedIds = {};
+    db.entries.forEach(function (e) { loggedIds[e.issueId] = 1; });
+    var chartIssues = db.issues.filter(function (x) { return x.kind !== 'period' && x.kind !== 'poop' && loggedIds[x.id]; });
+    if (chartIssues.length) { h += patChart(chartIssues, all, t, colors); h += patHeat(chartIssues, all, t, first); }
     return h + navBar('patterns');
   }
 
@@ -1005,7 +1038,7 @@
     Object.keys(db.periodFlow).forEach(function (d) { rows.push({ type: 'flow', date: d }); });
     db.periodEnds.forEach(function (d) { rows.push({ type: 'periodEnd', date: d }); });
     rows.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
-    var h = banner('Everything you logged', 'History');
+    var h = patHeader('history');
     if (!rows.length) return h + '<div class="card empty"><p>' + tr('Nothing logged yet.') + '</p></div>' + navBar('history');
     function dayHead(ds) {
       var d = parse(ds), n = diffDays(todayIso(), ds);
