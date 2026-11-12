@@ -100,7 +100,7 @@
 
   /* ---------- Icons ---------- */
   var ICONS = {
-    snow: '<path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9"/>',
+    snow: '<path d="M12 2.5v19M3.8 7.25l16.4 9.5M3.8 16.75l16.4-9.5M9.5 4.5L12 7l2.5-2.5M9.5 19.5L12 17l2.5 2.5M5.4 10.3l3.4-.9-.9-3.4M18.6 13.7l-3.4.9.9 3.4M5.4 13.7l3.4.9-.9 3.4M18.6 10.3l-3.4-.9.9-3.4"/>',
     sprout: '<path d="M12 21v-8"/><path d="M12 13c0-4-3-6-7-6 0 4 3 6 7 6z"/><path d="M12 11c0-3 2-5 6-5 0 3-2 5-6 5z"/>',
     sun: '<circle cx="12" cy="12" r="3.5"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6L7 7M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4"/>',
     leaf: '<path d="M5 19C5 10 10 5 20 4c0 10-5 15-14 15z"/><path d="M5 19l8-8"/>',
@@ -461,7 +461,26 @@
     var sweep = k < 0.5 ? (waning ? 1 : 0) : (waning ? 0 : 1);
     return outer + 'A' + rx.toFixed(2) + ' ' + r + ' 0 0 ' + sweep + ' ' + x + ' ' + top + 'Z';
   }
+  /* Today ring: phase segments with a marker on the selected day. Tap a spot or drag to pick a day. */
+  function phaseRing(info) {
+    var cl = info.cl, per = 360 / cl, gap = 3, parts = '', hits = '';
+    var pick = ui.dayPick && ui.dayPick !== info.day ? ui.dayPick : null, shown = pick || info.day;
+    phaseLayout().forEach(function (ph) {
+      var a0 = (ph.from - 1) * per + gap / 2, a1 = ph.to * per - gap / 2;
+      parts += '<path d="' + arc(150, 150, 108, a0, a1) + '" stroke="' + (ph.key === phaseOfDay(shown) ? PHASES[ph.key].hex : PHASES[ph.key].pale) + '" stroke-width="30" fill="none"/>';
+    });
+    for (var d = 1; d <= cl; d++) {
+      hits += '<path data-act="moonDay" data-d="' + d + '" style="cursor:pointer" d="' + arc(150, 150, 108, (d - 1) * per, d * per) + '" stroke="transparent" stroke-width="34" fill="none" role="button" aria-label="' + tr('Cycle day {n}', { n: d }) + '"/>';
+    }
+    var dt = parse(addDays(info.start, shown - 1));
+    var t = ((shown - 0.5) * per - 90) * Math.PI / 180, mx = 150 + 108 * Math.cos(t), my = 150 + 108 * Math.sin(t);
+    return '<svg class="donut" viewBox="0 0 300 300" role="img" aria-label="' + tr('Cycle day {d} of about {cl}, {phase}', { d: info.rawDay, cl: cl, phase: pt(info.phase) }) + '">' + parts + hits +
+      '<circle cx="' + mx.toFixed(1) + '" cy="' + my.toFixed(1) + '" r="13" fill="#A9C4E8" style="stroke:var(--ink)" stroke-width="3" pointer-events="none"/>' +
+      '<text x="150" y="168" text-anchor="middle" font-size="68" font-weight="700" style="font-family:var(--serif);fill:var(--ink)" pointer-events="none">' + dt.getDate() + '</text>' +
+      '<text x="150" y="204" text-anchor="middle" font-size="24" font-weight="500" style="fill:var(--ink)" pointer-events="none">' + MON_SHORT[dt.getMonth()] + '</text></svg>';
+  }
   function moonRing(info, whenShort, compact) {
+    if (compact) return phaseRing(info);
     var cl = info.cl, R = 140, C = 170, mr = Math.min(13.5, 0.4 * 2 * Math.PI * R / cl), parts = '';
     var pick = compact && ui.dayPick && ui.dayPick !== info.day ? ui.dayPick : null;
     for (var d = 1; d <= cl; d++) {
@@ -643,7 +662,7 @@
   });
   function dayDetails(info, d) {
     var cl = info.cl, od = cl - 14, ph = PHASES[phaseOfDay(d)], date = addDays(info.start, d - 1), n = diffDays(date, todayIso());
-    var when = shortDate(date) + (n === 0 ? ' · ' + tr('today') : n === 1 ? ' · ' + tr('tomorrow') : n === -1 ? ' · ' + tr('yesterday') : n > 0 ? ' · ' + tr('in {n} days', { n: n }) : ' · ' + tr('{n} days ago', { n: -n }));
+    var when = n === 0 ? tr('today') : n === 1 ? tr('tomorrow') : n === -1 ? tr('yesterday') : n > 0 ? tr('in {n} days', { n: n }) : tr('{n} days ago', { n: -n });
     var high = HORMONES.filter(function (hm) {
       var mn = 9, mx = -9, t; for (t = 1; t <= cl; t++) { var v = hm.f(t, od); mn = Math.min(mn, v); mx = Math.max(mx, v); }
       return (hm.f(d, od) - mn) / (mx - mn) >= 0.7;

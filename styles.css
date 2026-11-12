@@ -504,7 +504,7 @@ textarea { min-height: 92px; resize: vertical; }
 .pchart .axis text { fill: var(--muted); }
 .clegend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font-size: 14px; color: var(--ink); }
 .clegend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
-.hmap { background: #F8EEE4; border-color: transparent; padding: 18px 14px; }
+.hmap { padding: 18px 14px; }
 .hm-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .hm-name { flex: 0 0 84px; font-weight: 700; font-size: 13px; line-height: 1.15; overflow-wrap: break-word; hyphens: auto; }
 .hm-cells, .hm-x { flex: 1; display: grid; gap: 1.5px; min-width: 0; }
@@ -578,7 +578,7 @@ h1, h2, .pwhen { font-family: var(--serif); }
 .note-card .chip { background: var(--tint); color: var(--brand); }
 .insight, .delta { background: var(--tint); color: var(--brand); }
 .tile-pink, .tile-orange, .tile-blue, .tile-yellow, .tile-lilac, .tile-green { background: var(--tint); color: var(--brand); }
-.hmap, .round-nav, .bristol .art { background: var(--tint); }
+.round-nav, .bristol .art { background: var(--tint); }
 .round-nav { color: var(--brand); }
 .bar { background: var(--tint); }
 .pcell.before { background: var(--tint); }
