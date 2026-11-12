@@ -100,6 +100,10 @@
 
   /* ---------- Icons ---------- */
   var ICONS = {
+    snow: '<path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9"/>',
+    sprout: '<path d="M12 21v-8"/><path d="M12 13c0-4-3-6-7-6 0 4 3 6 7 6z"/><path d="M12 11c0-3 2-5 6-5 0 3-2 5-6 5z"/>',
+    sun: '<circle cx="12" cy="12" r="3.5"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6L7 7M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4"/>',
+    leaf: '<path d="M5 19C5 10 10 5 20 4c0 10-5 15-14 15z"/><path d="M5 19l8-8"/>',
     drop: '<path d="M12 3c3 4 6 7 6 11a6 6 0 0 1-12 0c0-4 3-7 6-11z"/>',
     poop: '<rect x="3" y="9" width="18" height="7" rx="3.5"/>',
     cyst: '<path d="M12 4v11M7 11l5 5 5-5M5 20h14"/>',
@@ -143,10 +147,10 @@
 
   /* ---------- Cycle maths ---------- */
   var PHASES = {
-    period: { label: 'Period', color: 'var(--period)', hex: '#8B3A5A' },
-    follicular: { label: 'Follicular', color: 'var(--follicular)', hex: '#3F7A63' },
-    ovulation: { label: 'Ovulation', color: 'var(--ovulation)', hex: '#B8862F' },
-    luteal: { label: 'Luteal', color: 'var(--luteal)', hex: '#4B4BA0' }
+    period: { label: 'Period', color: 'var(--period)', hex: '#4A6FA5', pale: '#C9D2E3', text: '#2E4A7D', season: 'winter' },
+    follicular: { label: 'Follicular', color: 'var(--follicular)', hex: '#6FA044', pale: '#D3E1C3', text: '#447528', season: 'spring' },
+    ovulation: { label: 'Ovulation', color: 'var(--ovulation)', hex: '#E8A425', pale: '#F6DFB1', text: '#A84A0A', season: 'summer' },
+    luteal: { label: 'Luteal', color: 'var(--luteal)', hex: '#B34E25', pale: '#E8C9B9', text: '#A3441E', season: 'autumn' }
   };
   function pl(k) { return tr(PHASES[k].label); }
   function pt(k) { return tr(PHASES[k].label + ' phase'); }
@@ -440,7 +444,7 @@
     var mx = 150 + 108 * Math.cos(t), my = 150 + 108 * Math.sin(t);
     return '<svg class="donut" viewBox="0 0 300 300" role="img" aria-label="' + tr('Cycle day {d} of about {cl}', { d: info.rawDay, cl: cl }) + '">' + parts +
       '<circle cx="' + mx.toFixed(1) + '" cy="' + my.toFixed(1) + '" r="13" fill="#fff" stroke="' + PHASES[info.phase].hex + '" stroke-width="3"/>' +
-      '<text x="150" y="152" text-anchor="middle" font-size="44" font-weight="700" fill="#2A2433">' + tr('Day {n}', { n: info.rawDay }) + '</text>' +
+      '<text x="150" y="152" text-anchor="middle" font-size="44" font-weight="700" style="fill:var(--ink)">' + tr('Day {n}', { n: info.rawDay }) + '</text>' +
       '<text x="150" y="182" text-anchor="middle" font-size="16" fill="#5F5868">' + tr('of about {n}', { n: cl }) + '</text></svg>';
   }
 
@@ -461,30 +465,30 @@
     for (var d = 1; d <= cl; d++) {
       var a = (d - 0.5) / cl * 2 * Math.PI - Math.PI / 2, cx = C + R * Math.cos(a), cy = C + R * Math.sin(a);
       var f = (d - 0.5) / cl, k = (1 - Math.cos(f * 2 * Math.PI)) / 2, waning = f > 0.5;
-      var col = PHASES[phaseOfDay(d)].hex;
+      var pk = phaseOfDay(d), col = pk === info.phase ? PHASES[pk].hex : PHASES[pk].pale;
       if (compact) parts += '<g data-act="moonDay" data-d="' + d + '" style="cursor:pointer" role="button" aria-label="' + tr('Cycle day {n}', { n: d }) + '">';
-      parts += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="' + mr.toFixed(1) + '" fill="#FBF3EA" stroke="' + col + '" stroke-width="2"/>';
+      parts += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="' + mr.toFixed(1) + '" style="fill:var(--card)" stroke="' + col + '" stroke-width="2"/>';
       var p = moonPath(0, 0, mr - 1, k, waning);
       if (p) parts += '<path transform="translate(' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ')" d="' + p + '" fill="' + col + '"/>';
-      if (d === info.day) parts += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="' + (mr + 6).toFixed(1) + '" fill="none" stroke="#2A2433" stroke-width="' + (pick ? 1.5 : 3) + '"' + (pick ? ' stroke-dasharray="3 3"' : '') + '/>';
-      if (d === pick) parts += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="' + (mr + 6).toFixed(1) + '" fill="none" stroke="#2A2433" stroke-width="3"/>';
+      if (d === info.day) parts += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="' + (mr + 6).toFixed(1) + '" fill="none" style="stroke:var(--ink)" stroke-width="' + (pick ? 1.5 : 3) + '"' + (pick ? ' stroke-dasharray="3 3"' : '') + '/>';
+      if (d === pick) parts += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="' + (mr + 6).toFixed(1) + '" fill="none" style="stroke:var(--ink)" stroke-width="3"/>';
       if (compact) parts += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="' + (mr + 6).toFixed(1) + '" fill="transparent"/></g>';
     }
     var ph = PHASES[info.phase];
     if (compact) return '<svg class="donut" viewBox="0 0 340 340" role="img" aria-label="' + tr('Cycle day {d} of about {cl}, {phase}', { d: info.rawDay, cl: cl, phase: pt(info.phase) }) + '">' + parts +
-      '<text x="170" y="150" text-anchor="middle" font-size="26" font-weight="500" fill="#2A2433" pointer-events="none">' + tr('Day') + '</text>' +
-      '<text x="170" y="214" text-anchor="middle" font-size="76" font-weight="700" fill="#2A2433" pointer-events="none">' + (pick || info.rawDay) + '</text></svg>';
+      '<text x="170" y="150" text-anchor="middle" font-size="26" font-weight="500" style="fill:var(--ink)" pointer-events="none">' + tr('Day') + '</text>' +
+      '<text x="170" y="206" text-anchor="middle" font-size="62" font-weight="700" style="font-family:var(--serif);fill:var(--ink)" pointer-events="none">' + (pick || info.rawDay) + '</text></svg>';
     return '<svg class="donut" viewBox="0 0 340 340" role="img" aria-label="' + tr('Cycle day {d} of about {cl}, {phase}', { d: info.rawDay, cl: cl, phase: pt(info.phase) }) + '">' + parts +
-      '<text x="170" y="138" text-anchor="middle" font-size="15" font-weight="700" letter-spacing="2" fill="' + ph.hex + '">' + pt(info.phase).toUpperCase() + '</text>' +
-      '<text x="170" y="192" text-anchor="middle" font-size="56" font-weight="700" fill="#2A2433">' + tr('Day {n}', { n: info.rawDay }) + '</text>' +
-      '<text x="170" y="224" text-anchor="middle" font-size="16" fill="#2A2433">' + esc(whenShort) + '</text></svg>';
+      '<text x="170" y="138" text-anchor="middle" font-size="15" font-weight="700" letter-spacing="2" fill="' + ph.text + '">' + pt(info.phase).toUpperCase() + '</text>' +
+      '<text x="170" y="192" text-anchor="middle" font-size="48" font-weight="700" style="font-family:var(--serif);fill:var(--ink)">' + tr('Day {n}', { n: info.rawDay }) + '</text>' +
+      '<text x="170" y="224" text-anchor="middle" font-size="16" style="fill:var(--ink)">' + esc(whenShort) + '</text></svg>';
   }
   function gauss(t, mu, sl, sr) { var s = t < mu ? sl : sr, z = (t - mu) / s; return Math.exp(-z * z / 2); }
   var HORMONES = [
-    { key: 'Estrogen', hex: '#E4572E', area: true, f: function (t, od) { return 0.1 + 0.9 * gauss(t, od - 1, 4.4, 2) + 0.5 * gauss(t, od + 7, 3.6, 3.6); } },
-    { key: 'Progesterone', hex: '#D6479B', area: true, f: function (t, od) { return 0.03 + 0.85 * gauss(t, od + 7, 3.4, 3.6); } },
-    { key: 'Testosterone', hex: '#5F6B7A', area: false, f: function (t, od) { return 0.2 + 0.14 * gauss(t, od, 3, 3); } },
-    { key: 'LH', hex: '#1EA3C2', area: true, f: function (t, od) { return 0.04 + 0.96 * gauss(t, od - 0.5, 0.9, 0.9); } }
+    { key: 'Estrogen', hex: '#A03A6A', area: true, f: function (t, od) { return 0.1 + 0.9 * gauss(t, od - 1, 4.4, 2) + 0.5 * gauss(t, od + 7, 3.6, 3.6); } },
+    { key: 'Progesterone', hex: '#4B40B0', area: true, f: function (t, od) { return 0.03 + 0.85 * gauss(t, od + 7, 3.4, 3.6); } },
+    { key: 'Testosterone', hex: '#A87A18', area: false, f: function (t, od) { return 0.2 + 0.14 * gauss(t, od, 3, 3); } },
+    { key: 'LH', hex: '#2E7D50', area: true, f: function (t, od) { return 0.04 + 0.96 * gauss(t, od - 0.5, 0.9, 0.9); } }
   ];
   function hormoneNote(info) {
     var od = info.cl - 14, d = info.rawDay;
@@ -508,10 +512,10 @@
       svg += '<path d="' + line + '" fill="none" stroke="' + hm.hex + '" stroke-width="' + (on ? 3.5 : 2.5) + '" stroke-linejoin="round" opacity="' + (dim ? 0.18 : 1) + '"/>';
     });
     var mx = X(Math.min(info.day, cl)).toFixed(1);
-    svg += '<line x1="' + mx + '" y1="' + (yt - 2) + '" x2="' + mx + '" y2="' + yb + '" stroke="#2A2433" stroke-width="2"/><circle cx="' + mx + '" cy="' + (yt - 2) + '" r="5" fill="#2A2433"/>';
+    svg += '<line x1="' + mx + '" y1="' + (yt - 2) + '" x2="' + mx + '" y2="' + yb + '" style="stroke:var(--ink)" stroke-width="2"/><circle cx="' + mx + '" cy="' + (yt - 2) + '" r="5" style="fill:var(--ink)"/>';
     var bars = phaseLayout().map(function (p) {
       var a = X(p.from - 0.5 < 1 ? 1 : p.from - 0.5), b = X(p.to + 0.5 > cl ? cl : p.to + 0.5);
-      return '<rect x="' + (a + 1).toFixed(1) + '" y="' + (yb + 6) + '" width="' + Math.max(2, b - a - 2).toFixed(1) + '" height="7" rx="3.5" fill="' + PHASES[p.key].hex + '"/><text x="' + ((a + b) / 2).toFixed(1) + '" y="' + (yb + 24) + '" text-anchor="middle" font-size="9.5" font-weight="700" fill="#6B6573">' + pl(p.key) + '</text>';
+      return '<rect x="' + (a + 1).toFixed(1) + '" y="' + (yb + 6) + '" width="' + Math.max(2, b - a - 2).toFixed(1) + '" height="7" rx="3.5" fill="' + (p.key === info.phase ? PHASES[p.key].hex : PHASES[p.key].pale) + '"/><text x="' + ((a + b) / 2).toFixed(1) + '" y="' + (yb + 24) + '" text-anchor="middle" font-size="9.5" font-weight="700" fill="#6B6573">' + pl(p.key) + '</text>';
     }).join('');
     var legend = HORMONES.map(function (hm) { return '<button class="hleg' + (sel === hm.key ? ' on' : sel ? ' off' : '') + '" data-act="hormone" data-k="' + hm.key + '" aria-pressed="' + (sel === hm.key) + '"><i style="background:' + hm.hex + '"></i>' + tr(hm.key) + '</button>'; }).join('');
     return '<section class="card hpage"><div class="legend">' + legend + '</div>' +
@@ -556,7 +560,7 @@
     if (ui.dayPick && ui.dayPick !== info.day) return dayDetails(info, ui.dayPick);
     var ph = PHASES[info.phase];
     var whenShort = info.late ? tr('Period may be late') : info.phase === 'period' ? tr('Period day {n} of about {m}', { n: info.rawDay, m: db.settings.periodLength }) : tn('Period in about {n} day', 'Period in about {n} days', info.toPeriod);
-    return '<span class="plabel" style="color:' + ph.hex + '">' + pt(info.phase) + '</span><span class="pwhen">' + esc(whenShort) + '</span>';
+    return '<span class="plabel" style="color:' + ph.text + '">' + pt(info.phase) + '</span><span class="pwhen">' + esc(whenShort) + '</span>';
   }
   /* Drag around the moon ring to scrub through the cycle days. Updates in place so the dragged element survives. */
   var scrub = null, suppressClick = false;
@@ -642,14 +646,14 @@
       var mn = 9, mx = -9, t; for (t = 1; t <= cl; t++) { var v = hm.f(t, od); mn = Math.min(mn, v); mx = Math.max(mx, v); }
       return (hm.f(d, od) - mn) / (mx - mn) >= 0.7;
     }).map(function (hm) { return hm.key; });
-    return '<span class="plabel" style="color:' + ph.hex + '">' + pt(phaseOfDay(d)) + '</span><span class="pwhen sm">' + esc(when) + '</span>' +
+    return '<span class="plabel" style="color:' + ph.text + '">' + pt(phaseOfDay(d)) + '</span><span class="pwhen sm">' + esc(when) + '</span>' +
       (n <= 0 ? '<span class="pmini">' + esc(tr('Next one on {d}', { d: shortDate(addDays(info.start, cl + d - 1)) })) + '</span>' : '') +
 
       '<button class="plink" data-act="moonDay" data-d="' + d + '">' + tr('Back to today') + '</button>';
   }
   function viewToday() {
     var info = cycleInfo(todayIso());
-    var h = '<div class="banner"><div><small>' + esc(longToday()) + '</small><h1>' + tr('Today') + '</h1></div></div>';
+    var h = '<div class="banner">' + seasonIco() + '<h1>' + tr('Today') + '</h1><small>' + esc(longToday()) + '</small></div>';
     if (!info) {
       return h + '<div class="card setup">' + langPicker('margin-top:0') + '<h2 style="margin-top:20px">' + tr('When did your last period start?') + '</h2><p>' + tr('Add the first day and I will work out where you are in your cycle. You can change it any time.') + '</p>' +
         '<input type="date" id="firstStart" max="' + todayIso() + '" value="' + todayIso() + '">' +
@@ -669,9 +673,9 @@
   }
 
   function banner(small, title, backTo) {
-    return '<div class="banner' + (backTo ? ' has-back' : '') + '">' +
+    return '<div class="banner' + (backTo ? ' has-back' : '') + '">' + (backTo ? '' : seasonIco()) +
       (backTo ? '<button class="round-btn back-btn" data-act="go" data-v="' + backTo + '" aria-label="' + tr('Go back') + '">' + icon('back') + '</button>' : '') +
-      '<div><small>' + esc(tr(small)) + '</small><h1>' + esc(tr(title)) + '</h1></div></div>';
+      '<h1>' + esc(tr(title)) + '</h1><small>' + esc(tr(small)) + '</small></div>';
   }
   function viewLog() {
     function row(i) {
@@ -848,14 +852,6 @@
     ['injection', 'Injection', 'Hormonal method', 'Bleeding often becomes irregular or stops. Phases are only a rough guide.'],
     ['other', 'Other or not sure', 'Rough guide', 'Phases are shown as a rough guide.']
   ];
-  var SOURCES = [
-    ['Monica Germani, Chiara Amati', 'Il bello degli ormoni (Mondadori)', ''],
-    ['Roots to Leaves', 'If Your Luteal Phase Sucks, Then Read This', 'https://rootstoleaves.substack.com/p/if-your-luteal-phase-sucks-then-read'],
-    ['Sabrina Rose', 'The Transformative Power of the Luteal Phase', 'https://moonbeambysabrina.substack.com/p/the-transformative-power-of-the-luteal'],
-    ['Bhielle', 'softening into your luteal phase', 'https://bhielle.substack.com/p/softening-into-your-luteal-phase'],
-    ['Valerie Ribon', 'Your Cycle Gives You Superpowers (A Guide)', 'https://valerieribon.substack.com/p/your-cycle-gives-you-superpowers'],
-    ['Sophie Trotman', '10 Things I Wish Women Knew About Their Menstrual Cycle', 'https://sophietrotmannutrition.substack.com/p/10-things-i-wish-women-knew-about']
-  ];
   function langPicker(style) {
     return '<div class="label" style="' + (style || '') + '">' + tr('Language and seasonal produce') + '</div><div class="lang-row">' +
       '<button class="opt ' + (lang === 'en' ? 'on' : '') + '" data-act="setLang" data-l="en" aria-label="English, Dutch seasonal produce" aria-pressed="' + (lang === 'en') + '">EN / NL</button>' +
@@ -879,7 +875,6 @@
       '<button class="btn secondary" data-act="importNotes">' + tr('Import data') + '</button>' +
       '<button class="btn secondary" data-act="export">' + tr('Download backup') + '</button>' +
       '<button class="btn danger" data-act="wipe">' + tr('Delete all my data') + '</button>';
-    h += '<div class="label">' + tr('Sources') + '</div><p class="sub">' + tr('Not medical advice. The tips in the app are my own summaries of these sources:') + '</p><ul class="know" style="margin-bottom:16px">' + SOURCES.map(function (r) { return '<li>' + (r[2] ? '<a href="' + r[2] + '" target="_blank" rel="noopener">' + esc(r[1]) + '</a>' : esc(r[1])) + ' (' + esc(r[0]) + ')</li>'; }).join('') + '</ul>';
     return h + navBar('settings');
   }
 
@@ -898,7 +893,7 @@
     return d.getFullYear() + '-' + pad(d.getMonth() + 1);
   }
   function patHeader(active) {
-    return '<div class="banner pat-banner"><h1>' + tr('Patterns') + '</h1></div>' +
+    return '<div class="banner pat-banner">' + seasonIco() + '<h1>' + tr('Patterns') + '</h1></div>' +
       '<div class="seg" role="tablist">' +
       ['patterns', 'history'].map(function (v) {
         return '<button role="tab" class="' + (active === v ? 'on' : '') + '" aria-selected="' + (active === v) + '" data-act="go" data-v="' + v + '">' + tr(v === 'patterns' ? 'Overview' : 'History') + '</button>';
@@ -938,7 +933,7 @@
     for (var b = 0; b < offset; b++) cells += '<div></div>';
     all.forEach(function (d, i) {
       var ph = phaseOn(d), cls = 'pday' + (d === t ? ' today' : '') + (d > t ? ' future' : '');
-      cells += '<div class="' + cls + '"' + (ph ? ' style="background:' + PHASES[ph].hex + (d > t ? '30' : '66') + '"' : '') + ' title="' + shortDate(d) + (ph ? ' · ' + pl(ph) : '') + '">' + (i + 1) + '</div>';
+      cells += '<div class="' + cls + '"' + (ph ? ' style="background:' + PHASES[ph].pale + (d > t ? ';opacity:.65' : '') + '"' : '') + ' title="' + shortDate(d) + (ph ? ' · ' + pl(ph) : '') + '">' + (i + 1) + '</div>';
     });
     var legend = ['period', 'follicular', 'ovulation', 'luteal'].map(function (k) { return '<span><i style="background:' + PHASES[k].hex + '33;border-color:' + PHASES[k].hex + '"></i>' + pl(k) + '</span>'; }).join('');
     return '<div class="pgrid pcal">' + cells + '</div><div class="hlegend phlegend">' + legend + '</div>';
@@ -952,7 +947,7 @@
       var p = phaseOn(all[i]), j = i;
       while (j + 1 < n && phaseOn(all[j + 1]) === p) j++;
       var x0 = i === 0 ? L : (X(i) + X(i - 1)) / 2, x1 = j === n - 1 ? L + pw : (X(j) + X(j + 1)) / 2;
-      bands += '<rect x="' + x0.toFixed(1) + '" y="' + T + '" width="' + (x1 - x0).toFixed(1) + '" height="' + ph + '" fill="' + (p ? PHASES[p].hex + '33' : '#EFE9E2') + '"/>';
+      bands += '<rect x="' + x0.toFixed(1) + '" y="' + T + '" width="' + (x1 - x0).toFixed(1) + '" height="' + ph + '" fill="' + (p ? PHASES[p].pale : '#EFE9E2') + '" fill-opacity="0.55"/>';
       i = j + 1;
     }
     var grid = '<line x1="' + L + '" x2="' + (L + pw) + '" y1="' + Y(5) + '" y2="' + Y(5) + '" stroke="#9a929f" stroke-dasharray="3 3" stroke-width="1" opacity=".6"/>';
@@ -1177,7 +1172,7 @@ function whyFor(phase, n) {
   function viewEat() {
     var nowM = new Date().getMonth() + 1, m = nowM, itl = lang === 'it', S = (itl ? SEASON_IT : SEASON)[m], IMP = itl ? IMPORT_IT : IMPORT[m];
     var info = cycleInfo(todayIso());
-    var h = '<div class="banner"><div><small>' + tr(itl ? 'Grown in Italy' : 'Grown in the Netherlands') + '</small><h1>' + tr('Eat') + '</h1></div></div>';
+    var h = '<div class="banner">' + seasonIco() + '<h1>' + tr('Eat') + '</h1><small>' + tr(itl ? 'Grown in Italy' : 'Grown in the Netherlands') + '</small></div>';
     var all = S.veg.concat(S.fruit, VEG_ALL, IMP);
     var fp = null;
     if (info) {
@@ -1186,10 +1181,6 @@ function whyFor(phase, n) {
       h += '<section class="card"><h2>' + tr('For your {phase}', { phase: pt(info.phase).toLowerCase() }) + '</h2><p>' + esc(tr(fp.why)) + '</p>';
       h += match.length ? '<p class="muted" style="margin:10px 0 8px">' + tr('In season in {m} and a good fit:', { m: MONTHS[m - 1] }) + '</p>' + '<div class="why-list">' + (ui.eatMore ? match : match.slice(0, 6)).map(function (n) { return '<div class="why-row"><b>' + esc(cap(tr(n))) + '</b><span>' + esc(whyFor(info.phase, n)) + '</span></div>'; }).join('') + '</div>' + (match.length > 6 ? '<button class="more" data-act="eatMore">' + (ui.eatMore ? tr('Show less') : tr('Show {n} more', { n: match.length - 6 })) + '</button>' : '') : '<p class="muted" style="margin-top:8px">' + tr('Nothing on the list below is a standout for this phase this month, so just eat what you enjoy.') + '</p>';
       h += '</section>';
-    }
-    if (recentGut()) {
-      var gm = all.filter(function (n) { return GUT_FOODS.indexOf(n) !== -1; });
-      if (gm.length) h += '<section class="card"><h2>' + tr('If your tummy is touchy') + '</h2><p>' + tr('You logged gut or poo notes recently. Cooked veg is usually gentler than raw, and these are in season and mild:') + '</p><div style="height:8px"></div>' + pills(gm, 'mild') + '</section>';
     }
     h += '<section class="card"><h2>' + tr('Vegetables in {m}', { m: MONTHS[m - 1] }) + '</h2>' + pills(S.veg.concat(VEG_ALL), 'veg', fp ? fp.foods : null) + '</section>';
     h += '<section class="card"><h2>' + tr('Fruit in {m}', { m: MONTHS[m - 1] }) + '</h2>' + pills(S.fruit, 'fruit', fp ? fp.foods : null) + '</section>';
@@ -1348,8 +1339,21 @@ function viewLearn() {
     return h;
   }
 
+  function seasonIco() {
+    var ci = null; try { ci = cycleInfo(todayIso()); } catch (e) {}
+    return '<span class="s-ico">' + icon({ winter: 'snow', spring: 'sprout', summer: 'sun', autumn: 'leaf' }[ci ? PHASES[ci.phase].season : 'spring']) + '</span>';
+  }
+  function applySeason() {
+    var ci = null;
+    try { ci = cycleInfo(todayIso()); } catch (e) {}
+    var season = ci ? PHASES[ci.phase].season : 'spring';
+    document.documentElement.setAttribute('data-season', season);
+    var m = document.querySelector('meta[name=theme-color]');
+    if (m) m.setAttribute('content', { winter: '#EDF1F7', spring: '#F5F9EE', summer: '#FFF8E7', autumn: '#FBF3E8' }[season]);
+  }
   function render() {
     var v = ui.view, html;
+    applySeason();
     if (onboarding) { app.className = 'noNav'; app.innerHTML = viewOnboarding(); return; }
     if (v === 'today') html = viewToday();
     else if (v === 'patterns') html = viewPatterns();
