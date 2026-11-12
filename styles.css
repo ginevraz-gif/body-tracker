@@ -593,3 +593,4 @@ h1, h2, .pwhen { font-family: var(--serif); }
 .flow-card .flow-end { background: var(--brand); color: var(--on-primary); }
 .big-row.sortable.dragging { background: var(--tint); }
 .hm.lx { border-color: var(--line); }
+.onb-or { text-align: center; color: var(--muted); font-size: 14px; margin: 10px 0; }

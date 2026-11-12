@@ -292,7 +292,7 @@
     ['Finish demanding tasks early and keep the first two days of your period light if you can.', 'Finisci presto i compiti impegnativi e, se puoi, tieni leggeri i primi due giorni del ciclo.'],
 
     /* Import */
-    ['Copy a prompt for an AI', 'Copia un prompt per un’IA'], ['Choose a file', 'Scegli un file'], ['Restore from backup', 'Ripristina da backup'],
+    ['Copy a prompt for an AI', 'Copia un prompt per un’IA'], ['Choose a file', 'Scegli un file'], ['Set up my cycle', 'Configura il mio ciclo'], ['or', 'oppure'], ['Restore from a backup', 'Ripristina da un backup'], ['Restore from backup', 'Ripristina da backup'],
     ['{n} entry ready to import', '{n} voce pronta da importare'], ['{n} entries ready to import', '{n} voci pronte da importare'],
     ['Nothing to import yet', 'Ancora niente da importare'], ['and {n} more', 'e altre {n}'],
     ['New issues will be added: ', 'Verranno aggiunti nuovi disturbi: '],

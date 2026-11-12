@@ -319,11 +319,13 @@
     for (var i = 0; i < total; i++) h += '<i' + (i <= s ? ' class="on"' : '') + '></i>';
     h += '</div>';
     if (s === 0) {
-      h += '<svg class="onb-moon" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="40" fill="#FAEFE3"/><circle cx="50" cy="50" r="40" fill="none" stroke="#E8823F" stroke-width="6"/><path d="M50 10a40 40 0 0 1 0 80a24 40 0 0 0 0-80z" fill="#E8823F"/></svg>' +
+      h += '<svg class="onb-moon" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="40" style="fill:var(--tint)"/><circle cx="50" cy="50" r="40" fill="none" style="stroke:var(--primary)" stroke-width="6"/><path d="M50 10a40 40 0 0 1 0 80a24 40 0 0 0 0-80z" fill="#E8823F"/></svg>' +
         '<h1>' + tr('Welcome') + '</h1><p class="onb-lead">' + tr('Choose your language. It also sets which seasonal produce you see.') + '</p>' +
         '<button class="radio ' + (lang === 'en' ? 'on' : '') + '" data-act="onbLang" data-l="en" aria-pressed="' + (lang === 'en') + '"><i></i><span>English<br><small class="onb-sub">Dutch seasonal produce</small></span></button>' +
         '<button class="radio ' + (lang === 'it' ? 'on' : '') + '" data-act="onbLang" data-l="it" aria-pressed="' + (lang === 'it') + '"><i></i><span>Italiano<br><small class="onb-sub">Prodotti di stagione italiani</small></span></button>' +
-        '<div class="onb-spacer"></div><button class="btn" data-act="onbNext">' + tr('Continue') + '</button>';
+        '<div class="onb-spacer"></div><button class="btn" data-act="onbNext">' + tr('Set up my cycle') + '</button>' +
+        '<p class="onb-or">' + tr('or') + '</p>' +
+        '<button class="btn secondary" style="margin-top:0" data-act="import">' + tr('Restore from a backup') + '</button>';
     } else if (s === 1) {
       var y = +o.month.slice(0, 4), m = +o.month.slice(5, 7) - 1, first = (new Date(y, m, 1).getDay() + 6) % 7, n = new Date(y, m + 1, 0).getDate(), t = todayIso();
       var atNow = o.month === t.slice(0, 8) + '01';
@@ -1322,7 +1324,7 @@ function viewLearn() {
     var r = ui.imp;
     var h = banner('Settings', 'Import data', 'settings') +
       '<button class="btn secondary" data-act="copyPrompt">' + tr('Copy a prompt for an AI') + '</button>' +
-      '<label class="btn secondary" style="display:block;text-align:center;cursor:pointer">' + tr('Choose a file') + '<input type="file" id="notesFile" accept=".txt,.csv,.tsv,text/plain,text/csv" style="display:none"></label>' +
+      '<label class="btn secondary" style="display:block;text-align:center;cursor:pointer">' + tr('Choose a file') + '<input type="file" id="notesFile" accept=".txt,.csv,.tsv,.json,text/plain,text/csv,application/json" style="display:none"></label>' +
       '<button class="btn secondary" data-act="import">' + tr('Restore from backup') + '</button>';
     if (r) {
       h += '<div class="card" style="margin-top:14px"><h2>' + (r.rows.length ? tn('{n} entry ready to import', '{n} entries ready to import', r.rows.length) : tr('Nothing to import yet')) + '</h2>';
@@ -1673,18 +1675,31 @@ impGo: function () {
     if (!ev.target || ev.target.id !== 'notesFile') return;
     var f = ev.target.files && ev.target.files[0]; if (!f) return;
     var rd = new FileReader();
-    rd.onload = function () { ui.impText = String(rd.result || ''); ui.imp = parseNotes(ui.impText); render(); };
+    rd.onload = function () {
+      var txt = String(rd.result || '');
+      if (/\.json$/i.test(f.name) || /^\s*\{/.test(txt)) { if (!restoreBackup(txt)) toast(tr('That file is not a Body tracker backup.')); ev.target.value = ''; return; }
+      ui.impText = txt; ui.imp = parseNotes(ui.impText); render();
+    };
     rd.readAsText(f);
   });
+  /* Restore a JSON backup (from "Download backup"). Returns false if the text is not a backup. */
+  function restoreBackup(text) {
+    var s;
+    try { s = JSON.parse(text); } catch (e) { return false; }
+    if (!(s && s.settings && s.issues && s.entries && s.periodStarts)) return false;
+    if (!window.confirm(tr('Replace the data on this device with this backup?'))) return true;
+    if (!s.periodFlow) s.periodFlow = {};
+    if (!s.periodEnds) s.periodEnds = [];
+    db = s; onboarding = false;
+    try { localStorage.setItem(ONB_KEY, '1'); } catch (e) { /* ignore */ }
+    save(); ui.imp = null; ui.impText = ''; go('today'); toast(tr('Backup restored'));
+    return true;
+  }
   document.getElementById('importFile').addEventListener('change', function (ev) {
     var f = ev.target.files[0]; if (!f) return;
     var r = new FileReader();
     r.onload = function () {
-      try {
-        var s = JSON.parse(r.result);
-        if (!(s && s.settings && s.issues && s.entries && s.periodStarts)) throw new Error('bad');
-        if (window.confirm(tr('Replace the data on this device with this backup?'))) { db = s; save(); go('today'); toast(tr('Backup restored')); }
-      } catch (e) { toast(tr('That file is not a Body tracker backup.')); }
+      if (!restoreBackup(String(r.result || ''))) toast(tr('That file is not a Body tracker backup.'));
       ev.target.value = '';
     };
     r.readAsText(f);
