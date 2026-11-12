@@ -474,3 +474,12 @@ textarea { min-height: 92px; resize: vertical; }
 .onb-how svg { width: 20px; height: 20px; vertical-align: -4px; margin: 0 2px; color: var(--brand); }
 .onb-alert { display: grid; grid-template-columns: 24px 1fr; gap: 10px; align-items: start; background: #FDECEA; border: 1.5px solid #E7B1AB; color: #7A2420; border-radius: 16px; padding: 14px; margin-top: 16px; font-size: 15px; }
 .onb-alert svg { width: 22px; height: 22px; margin-top: 1px; }
+
+/* Confirmation dialog */
+.dlg { position: fixed; inset: 0; z-index: 100; background: rgba(42,36,51,.5); display: flex; align-items: center; justify-content: center; padding: 20px; }
+.dlg-box { background: #fff; border-radius: 20px; padding: 24px 20px 20px; max-width: 400px; width: 100%; box-shadow: 0 12px 40px rgba(0,0,0,.25); }
+.dlg-box h2 { font-size: 22px; font-weight: 700; margin-bottom: 10px; }
+.dlg-box p { color: var(--muted); line-height: 1.45; }
+.dlg-box .dlg-tip { margin-top: 10px; font-size: 14px; }
+.dlg-box .btn { margin-top: 12px; }
+.dlg-box .dlg-yes { margin-top: 20px; background: #C0392B; color: #fff; border: 2px solid #C0392B; }

@@ -307,7 +307,8 @@
     try { return !!(window.navigator.standalone || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)); } catch (e) { return false; }
   }
   var ONB_BC = [['combined', 'Combined pill'], ['progestin', 'Progestin-only pill'], ['patch', 'Patch or ring'], ['hiud', 'Hormonal IUD'], ['copper', 'Copper IUD'], ['implant', 'Implant'], ['injection', 'Injection'], ['other', 'Other or not sure']];
-  ui.onb = { step: 0, date: null, month: todayIso().slice(0, 8) + '01', bcYes: false, bc: 'combined', os: /android/i.test(navigator.userAgent) ? 'android' : 'ios' };
+  function newOnbState() { return { step: 0, date: null, month: todayIso().slice(0, 8) + '01', bcYes: false, bc: 'combined', os: /android/i.test(navigator.userAgent) ? 'android' : 'ios' }; }
+  ui.onb = newOnbState();
   function viewOnboarding() {
     var o = ui.onb, s = o.step, total = isInstalled() ? 3 : 4, h = '<div class="onb">';
     h += '<button class="onb-back' + (s > 0 ? ' show' : '') + '" data-act="onbBack">‹ ' + tr('Back') + '</button><div class="onb-dots">';
@@ -372,6 +373,24 @@
     try { localStorage.setItem(LANG_KEY, lang); localStorage.setItem(ONB_KEY, '1'); } catch (e) { /* ignore */ }
     onboarding = false; save(); go('today');
   }
+
+  /* ---------- Confirmation dialog for "Delete all my data" ---------- */
+  function closeDialog() { var d = document.getElementById('dlg'); if (d) d.remove(); }
+  function askWipe() {
+    closeDialog();
+    var d = document.createElement('div');
+    d.id = 'dlg'; d.className = 'dlg';
+    d.innerHTML = '<div class="dlg-box" role="alertdialog" aria-modal="true" aria-labelledby="dlgT" aria-describedby="dlgB">' +
+      '<h2 id="dlgT">' + tr('Are you sure?') + '</h2>' +
+      '<p id="dlgB">' + tr('This permanently deletes everything stored on this device: your cycle dates, symptoms, notes and settings. It cannot be undone.') + '</p>' +
+      '<p class="dlg-tip">' + tr('Tip: download a backup first if you might want your data back.') + '</p>' +
+      '<button class="btn dlg-yes" data-act="wipeYes">' + tr('Yes, delete everything') + '</button>' +
+      '<button class="btn secondary" data-act="dlgCancel">' + tr('Cancel') + '</button></div>';
+    d.addEventListener('click', function (ev) { if (ev.target === d) closeDialog(); });
+    document.body.appendChild(d);
+    var c = d.querySelector('[data-act="dlgCancel"]'); if (c) c.focus();
+  }
+  document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') closeDialog(); });
 
   function go(view, extra) {
     if (view === 'settings') ui.bcOpen = false;
@@ -1569,9 +1588,14 @@ impGo: function () {
       document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
     },
     import: function () { document.getElementById('importFile').click(); },
-    wipe: function () {
-      if (window.confirm(tr('Delete all your data from this device? This cannot be undone.'))) { db = defaultDb(); save(); go('today'); toast(tr('All data deleted')); }
+    wipe: function () { askWipe(); },
+    wipeYes: function () {
+      closeDialog();
+      /* Remove every stored key (not just reset the data) so a reload also lands in onboarding, then restart it. */
+      try { localStorage.removeItem(KEY); localStorage.removeItem(LANG_KEY); localStorage.removeItem(ONB_KEY); } catch (e) { /* ignore */ }
+      db = defaultDb(); ui.onb = newOnbState(); onboarding = true; applyLang('en'); go('today');
     },
+    dlgCancel: function () { closeDialog(); },
     onbLang: function (el) { var l = el.getAttribute('data-l'); if (l === 'en' || l === 'it') { applyLang(l); render(); } },
     onbNext: function () { var o = ui.onb; if (o.step === 2 && isInstalled()) return onbFinish(); o.step++; render(); window.scrollTo(0, 0); },
     onbBack: function () { if (ui.onb.step > 0) { ui.onb.step--; render(); window.scrollTo(0, 0); } },
